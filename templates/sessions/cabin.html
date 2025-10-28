@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Cabine · Sessão {{ session.code }}{% endblock %}
+
+{% block content %}
+  <div class="row g-4 align-items-center mb-4">
+    <div class="col-lg-8">
+      <h1 class="h3 mb-2">Cabine de votação</h1>
+      <p class="text-muted mb-0">Selecione um candidato para registrar o voto na sessão <strong>{{ session.code }}</strong>.</p>
+    </div>
+    <div class="col-lg-4 text-lg-end">
+      <a class="btn btn-outline-primary" href="/sessions/{{ session.id }}">Voltar aos detalhes</a>
+    </div>
+  </div>
+
+  <div class="alert alert-info" id="permit-alert">
+    Aguarde o mesário liberar o acesso. O token aparecerá automaticamente quando disponível.
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Candidatos</h2>
+          <form id="vote-form" class="d-grid gap-2">
+            {% if candidates %}
+              {% for candidate in candidates %}
+                <button
+                  type="button"
+                  class="btn btn-outline-primary btn-lg candidate-button"
+                  data-candidate-id="{{ candidate.id }}"
+                >
+                  {{ candidate.name }}
+                  <small class="d-block text-muted">Matrícula {{ candidate.registration }}</small>
+                </button>
+              {% endfor %}
+            {% else %}
+              <p class="text-muted">Nenhum candidato cadastrado para esta sessão.</p>
+            {% endif %}
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Status da cabine</h2>
+          <dl class="row mb-0">
+            <dt class="col-sm-4">Sessão</dt>
+            <dd class="col-sm-8">{{ session.code }}</dd>
+            <dt class="col-sm-4">Status</dt>
+            <dd class="col-sm-8">{{ session.status.value|replace('_', ' ')|title }}</dd>
+            <dt class="col-sm-4">Votos restantes</dt>
+            <dd class="col-sm-8">{{ session.remaining_votes }}</dd>
+          </dl>
+          <div class="mt-4">
+            <label class="form-label">Token recebido</label>
+            <input type="text" class="form-control" id="permit-token" readonly />
+          </div>
+          <div class="mt-3">
+            <button class="btn btn-success w-100" id="confirm-button" disabled>Confirmar voto</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const sessionId = {{ session.id }};
+    let selectedCandidate = null;
+    let permitToken = null;
+
+    const permitAlert = document.getElementById("permit-alert");
+    const permitInput = document.getElementById("permit-token");
+    const confirmButton = document.getElementById("confirm-button");
+    const candidateButtons = document.querySelectorAll(".candidate-button");
+
+    const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/ws/sessions/${sessionId}/cabine`);
+
+    socket.addEventListener("message", (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "vote_permit") {
+        permitToken = data.token;
+        permitInput.value = permitToken;
+        permitAlert.classList.replace("alert-info", "alert-success");
+        permitAlert.textContent = "Token recebido! Selecione um candidato e confirme o voto.";
+        updateConfirmButton();
+      }
+    });
+
+    socket.addEventListener("close", () => {
+      permitAlert.classList.replace("alert-info", "alert-warning");
+      permitAlert.textContent = "Conexão com o servidor perdida. Solicite um novo token ao mesário.";
+    });
+
+    candidateButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        candidateButtons.forEach((btn) => btn.classList.remove("active", "btn-primary"));
+        candidateButtons.forEach((btn) => btn.classList.add("btn-outline-primary"));
+        button.classList.remove("btn-outline-primary");
+        button.classList.add("btn-primary", "active");
+        selectedCandidate = button.dataset.candidateId;
+        updateConfirmButton();
+      });
+    });
+
+    confirmButton.addEventListener("click", async (event) => {
+      event.preventDefault();
+      if (!selectedCandidate || !permitToken) {
+        return;
+      }
+      confirmButton.disabled = true;
+      confirmButton.textContent = "Enviando...";
+      try {
+        const response = await fetch(`/api/sessions/${sessionId}/votes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ candidate_id: Number(selectedCandidate), permit_token: permitToken })
+        });
+        if (!response.ok) {
+          throw new Error("Falha ao registrar o voto.");
+        }
+        permitAlert.classList.replace("alert-success", "alert-info");
+        permitAlert.textContent = "Voto registrado com sucesso! Aguarde o próximo token.";
+        permitInput.value = "";
+        permitToken = null;
+        candidateButtons.forEach((btn) => {
+          btn.classList.remove("active", "btn-primary");
+          btn.classList.add("btn-outline-primary");
+        });
+        selectedCandidate = null;
+      } catch (error) {
+        permitAlert.classList.replace("alert-info", "alert-danger");
+        permitAlert.textContent = error.message || "Ocorreu um erro ao registrar o voto.";
+      } finally {
+        confirmButton.disabled = true;
+        confirmButton.textContent = "Confirmar voto";
+      }
+    });
+
+    function updateConfirmButton() {
+      confirmButton.disabled = !(selectedCandidate && permitToken);
+    }
+  </script>
+{% endblock %}

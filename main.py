@@ -3,7 +3,9 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import router
+from api.routes import router as api_router
+from frontend.routes import router as frontend_router
+
 from database import init_db
 
 # Definindo o ciclo de vida da aplicação (substitui @app.on_event)
@@ -30,4 +32,5 @@ app.add_middleware(
 )
 
 # Inclui as rotas principais
-app.include_router(router, prefix="/api")
+app.include_router(api_router, prefix="/api")
+app.include_router(frontend_router)

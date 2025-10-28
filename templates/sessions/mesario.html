@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Mesário · Sessão {{ session.code }}{% endblock %}
+
+{% block content %}
+  <div class="row g-4 align-items-center mb-4">
+    <div class="col-lg-8">
+      <h1 class="h3 mb-2">Área do mesário</h1>
+      <p class="text-muted mb-0">Gerencie autorizações de voto para a sessão <strong>{{ session.code }}</strong>.</p>
+    </div>
+    <div class="col-lg-4 text-lg-end">
+      <a class="btn btn-outline-primary" href="/sessions/{{ session.id }}">Voltar aos detalhes</a>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Emitir autorização</h2>
+          <p class="text-muted">Use o botão abaixo para gerar um novo token de votação para o próximo colaborador.</p>
+          <button class="btn btn-primary" id="authorize-button">Gerar token</button>
+          <div class="alert alert-info mt-3 d-none" id="authorization-alert"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Últimas autorizações</h2>
+          <p class="text-muted">Os tokens emitidos aparecem aqui e são enviados imediatamente para as cabines conectadas.</p>
+          <ul class="list-group" id="authorization-list"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const sessionId = {{ session.id }};
+    const authorizeButton = document.getElementById("authorize-button");
+    const authorizationAlert = document.getElementById("authorization-alert");
+    const authorizationList = document.getElementById("authorization-list");
+
+    const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/ws/sessions/${sessionId}/mesario`);
+
+    socket.addEventListener("message", (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "authorized") {
+        showAuthorization(`Token: ${data.token}`);
+      } else if (data.type === "error") {
+        showAlert(data.detail, true);
+      }
+    });
+
+    socket.addEventListener("close", () => {
+      showAlert("Conexão com o servidor encerrada.", true);
+    });
+
+    authorizeButton?.addEventListener("click", () => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ action: "authorize" }));
+        authorizeButton.disabled = true;
+        authorizeButton.textContent = "Aguardando...";
+      } else {
+        showAlert("Não foi possível comunicar com o servidor.", true);
+      }
+    });
+
+    function showAuthorization(message) {
+      const item = document.createElement("li");
+      item.className = "list-group-item d-flex justify-content-between align-items-center";
+      item.innerHTML = `<span>${message}</span><span class="badge text-bg-success">Enviado</span>`;
+      authorizationList.prepend(item);
+      showAlert("Token gerado com sucesso!", false);
+      authorizeButton.disabled = false;
+      authorizeButton.textContent = "Gerar token";
+    }
+
+    function showAlert(message, isError) {
+      authorizationAlert.textContent = message;
+      authorizationAlert.classList.remove("d-none", "alert-info", "alert-danger");
+      authorizationAlert.classList.add(isError ? "alert-danger" : "alert-info");
+      if (!isError) {
+        setTimeout(() => {
+          authorizationAlert.classList.add("d-none");
+        }, 5000);
+      }
+      if (isError) {
+        authorizeButton.disabled = false;
+        authorizeButton.textContent = "Gerar token";
+      }
+    }
+  </script>
+{% endblock %}

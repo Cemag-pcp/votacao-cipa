@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Sessões · Votação CIPA{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-0">Sessões de votação</h1>
+      <p class="text-muted mb-0">Visualize todas as sessões cadastradas e acompanhe seu andamento.</p>
+    </div>
+    <a class="btn btn-primary" href="/">Voltar para início</a>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th scope="col">Código</th>
+            <th scope="col">Status</th>
+            <th scope="col">Previstos</th>
+            <th scope="col">Apurados</th>
+            <th scope="col">Restantes</th>
+            <th scope="col" class="text-end">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if sessions %}
+            {% for session in sessions %}
+              <tr>
+                <td class="fw-semibold">{{ session.code }}</td>
+                <td>
+                  <span class="badge text-bg-{{ 'success' if session.status.value == 'in_progress' else 'secondary' }}">
+                    {{ session.status.value|replace('_', ' ')|title }}
+                  </span>
+                </td>
+                <td>{{ session.expected_votes }}</td>
+                <td>{{ session.total_votes }}</td>
+                <td>{{ session.remaining_votes }}</td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-primary" href="/sessions/{{ session.id }}">Detalhes</a>
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="6" class="text-center py-5 text-muted">
+                Nenhuma sessão cadastrada até o momento.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

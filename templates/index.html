@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Início · Votação CIPA{% endblock %}
+
+{% block content %}
+  <section class="row align-items-center mb-5">
+    <div class="col-lg-7">
+      <h1 class="display-5 fw-bold text-primary mb-3">Organize eleições da CIPA com agilidade</h1>
+      <p class="lead text-secondary">
+        Acompanhe sessões de votação, autorize eleitores e acompanhe resultados em tempo real em uma interface simples e responsiva.
+      </p>
+      <div class="d-flex gap-3">
+        <a class="btn btn-primary btn-lg" href="/sessions">Ver sessões</a>
+        <a class="btn btn-outline-primary btn-lg" href="#como-funciona">Como funciona</a>
+      </div>
+    </div>
+    <div class="col-lg-5 mt-4 mt-lg-0">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Sessões em andamento</h2>
+          {% if sessions %}
+            <ul class="list-group list-group-flush">
+              {% for session in sessions %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <span>
+                    <strong>{{ session.code }}</strong>
+                    <small class="d-block text-muted">{{ session.status.value|replace('_', ' ')|title }}</small>
+                  </span>
+                  <a class="btn btn-sm btn-outline-primary" href="/sessions/{{ session.id }}">Abrir</a>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-muted mb-0">Nenhuma sessão cadastrada até o momento.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="como-funciona" class="py-5 bg-white rounded-3 shadow-sm">
+    <div class="container">
+      <h2 class="text-center mb-4">Como funciona</h2>
+      <div class="row g-4">
+        <div class="col-md-4">
+          <div class="h-100 p-4 border rounded-3">
+            <div class="text-primary fs-2 mb-3">1</div>
+            <h3 class="h5">Cadastre a sessão</h3>
+            <p class="text-muted">Defina o código da eleição, estimativa de votos e cadastre os candidatos participantes.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="h-100 p-4 border rounded-3">
+            <div class="text-primary fs-2 mb-3">2</div>
+            <h3 class="h5">Autorize os eleitores</h3>
+            <p class="text-muted">Os mesários liberam o acesso de cada colaborador por meio de tokens únicos para a cabine de votação.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="h-100 p-4 border rounded-3">
+            <div class="text-primary fs-2 mb-3">3</div>
+            <h3 class="h5">Acompanhe o resultado</h3>
+            <p class="text-muted">Visualize a apuração em tempo real com total de votos e expectativa de participação.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

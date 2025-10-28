@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import enum
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -21,10 +19,10 @@ class VotingSession(SQLModel, table=True):
     start_time: Optional[datetime] = Field(default=None)
     end_time: Optional[datetime] = Field(default=None)
 
-    candidates: list[Candidate] = Relationship(back_populates="session")
-    poll_workers: list[PollWorker] = Relationship(back_populates="session")
-    permits: list[VotePermit] = Relationship(back_populates="session")
-    votes: list[Vote] = Relationship(back_populates="session")
+    candidates: list["Candidate"] = Relationship(back_populates="session")
+    poll_workers: list["PollWorker"] = Relationship(back_populates="session")
+    permits: list["VotePermit"] = Relationship(back_populates="session")
+    votes: list["Vote"] = Relationship(back_populates="session")
 
 
 class Candidate(SQLModel, table=True):
@@ -34,8 +32,8 @@ class Candidate(SQLModel, table=True):
     commission_number: str
 
     session_id: int = Field(foreign_key="votingsession.id")
-    session: VotingSession = Relationship(back_populates="candidates")
-    votes: list[Vote] = Relationship(back_populates="candidate")
+    session: "VotingSession" = Relationship(back_populates="candidates")
+    votes: list["Vote"] = Relationship(back_populates="candidate")
 
 
 class PollWorker(SQLModel, table=True):
@@ -44,7 +42,7 @@ class PollWorker(SQLModel, table=True):
     registration: str
 
     session_id: int = Field(foreign_key="votingsession.id")
-    session: VotingSession = Relationship(back_populates="poll_workers")
+    session: "VotingSession" = Relationship(back_populates="poll_workers")
 
 
 class VotePermit(SQLModel, table=True):
@@ -55,8 +53,8 @@ class VotePermit(SQLModel, table=True):
     used: bool = Field(default=False)
 
     session_id: int = Field(foreign_key="votingsession.id")
-    session: VotingSession = Relationship(back_populates="permits")
-    vote: Optional[Vote] = Relationship(back_populates="permit")
+    session: "VotingSession" = Relationship(back_populates="permits")
+    vote: Optional["Vote"] = Relationship(back_populates="permit")
 
 
 class Vote(SQLModel, table=True):
@@ -64,10 +62,10 @@ class Vote(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
     session_id: int = Field(foreign_key="votingsession.id")
-    session: VotingSession = Relationship(back_populates="votes")
+    session: "VotingSession" = Relationship(back_populates="votes")
 
     candidate_id: int = Field(foreign_key="candidate.id")
-    candidate: Candidate = Relationship(back_populates="votes")
+    candidate: "Candidate" = Relationship(back_populates="votes")
 
     permit_id: int = Field(foreign_key="votepermit.id", unique=True)
-    permit: VotePermit = Relationship(back_populates="vote")
+    permit: "VotePermit" = Relationship(back_populates="vote")

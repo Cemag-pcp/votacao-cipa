@@ -22,6 +22,18 @@ uvicorn app.main:app --reload
 
 O servidor ficará disponível em `http://127.0.0.1:8000`. A documentação automática pode ser acessada em `http://127.0.0.1:8000/docs`.
 
+### Navegação pela interface web
+
+As páginas HTML utilizam Bootstrap e ficam disponíveis diretamente no servidor FastAPI:
+
+- **Página inicial**: `http://127.0.0.1:8000/` — visão geral das sessões de votação cadastradas.
+- **Lista de sessões**: `http://127.0.0.1:8000/sessions` — atalho para todas as sessões.
+- **Detalhes da sessão**: `http://127.0.0.1:8000/sessions/<ID>` — substitua `<ID>` pelo identificador numérico da sessão.
+- **Área do mesário**: `http://127.0.0.1:8000/sessions/<ID>/mesario`
+- **Cabine de votação**: `http://127.0.0.1:8000/sessions/<ID>/cabine`
+
+Os links acima pressupõem que existam registros no banco de dados SQLite local. Você pode usar os endpoints da API descritos na seção seguinte para criar sessões, candidatos e mesários antes de navegar pela interface.
+
 ## Fluxo Geral
 
 1. **Criar a sessão** (`POST /api/sessions`). Informe o código (ex.: `2025.1`) e a quantidade esperada de votos.

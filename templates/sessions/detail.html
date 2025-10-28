@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Sessão {{ session.code }} · Votação CIPA{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-1">Sessão {{ session.code }}</h1>
+      <p class="text-muted mb-0">Status atual: {{ session.status.value|replace('_', ' ')|title }}</p>
+    </div>
+    <div class="btn-group">
+      <a class="btn btn-outline-primary" href="/sessions">Todas as sessões</a>
+      <a class="btn btn-primary" href="/sessions/{{ session.id }}/mesario">Área do mesário</a>
+      <a class="btn btn-success" href="/sessions/{{ session.id }}/cabine">Cabine de votação</a>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <p class="text-muted text-uppercase small mb-1">Votos previstos</p>
+          <p class="display-6 mb-0">{{ session.expected_votes }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <p class="text-muted text-uppercase small mb-1">Votos apurados</p>
+          <p class="display-6 mb-0">{{ session.total_votes }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <p class="text-muted text-uppercase small mb-1">Votos restantes</p>
+          <p class="display-6 mb-0">{{ session.remaining_votes }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <p class="text-muted text-uppercase small mb-1">Período</p>
+          <p class="mb-0">
+            {% if session.start_time %}
+              <small class="d-block">Início: {{ session.start_time.strftime('%d/%m/%Y %H:%M') }}</small>
+            {% else %}
+              <small class="d-block text-muted">Ainda não iniciado</small>
+            {% endif %}
+            {% if session.end_time %}
+              <small class="d-block">Encerramento: {{ session.end_time.strftime('%d/%m/%Y %H:%M') }}</small>
+            {% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white py-3">
+          <h2 class="h5 mb-0">Candidatos</h2>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th scope="col">Nome</th>
+                <th scope="col">Matrícula</th>
+                <th scope="col">Comissão</th>
+                <th scope="col" class="text-end">Votos</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if candidates %}
+                {% for candidate in candidates %}
+                  <tr>
+                    <td>{{ candidate.name }}</td>
+                    <td>{{ candidate.registration }}</td>
+                    <td>{{ candidate.commission_number }}</td>
+                    <td class="text-end fw-semibold">{{ candidate.votes }}</td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="4" class="text-center py-4 text-muted">
+                    Nenhum candidato cadastrado.
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white py-3">
+          <h2 class="h5 mb-0">Equipe de mesários</h2>
+        </div>
+        <ul class="list-group list-group-flush">
+          {% if poll_workers %}
+            {% for worker in poll_workers %}
+              <li class="list-group-item">
+                <div class="fw-semibold">{{ worker.name }}</div>
+                <small class="text-muted">Matrícula: {{ worker.registration }}</small>
+              </li>
+            {% endfor %}
+          {% else %}
+            <li class="list-group-item text-muted">Nenhum mesário cadastrado.</li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+  </div>
+{% endblock %}
