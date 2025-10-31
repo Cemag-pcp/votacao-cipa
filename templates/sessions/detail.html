@@ -5,7 +5,7 @@
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-      <h1 class="h3 mb-1">Sessão {{ session.code }}</h1>
+      <h1 class="h3 mb-1">Sessão: {{ session.code }}</h1>
       <p class="text-muted mb-0">Status atual: {{ session.status.value|replace('_', ' ')|title }}</p>
     </div>
     <div class="btn-group">
@@ -13,6 +13,16 @@
       <a class="btn btn-primary" href="/sessions/{{ session.id }}/mesario">Área do mesário</a>
       <a class="btn btn-success" href="/sessions/{{ session.id }}/cabine">Cabine de votação</a>
     </div>
+  </div>
+
+  <div class="mb-3">
+    {% if session.status.value == 'planned' %}
+      <button id="start-session" class="btn btn-outline-success btn-sm">Iniciar votação</button>
+    {% elif session.status.value == 'in_progress' %}
+      <button id="close-session" class="btn btn-outline-danger btn-sm">Encerrar votação</button>
+    {% else %}
+      <span class="badge text-bg-secondary">Sessão encerrada</span>
+    {% endif %}
   </div>
 
   <div class="row g-4 mb-4">
@@ -62,8 +72,31 @@
   <div class="row g-4">
     <div class="col-lg-7">
       <div class="card shadow-sm border-0 mb-4">
-        <div class="card-header bg-white py-3">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
           <h2 class="h5 mb-0">Candidatos</h2>
+          <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#candidateForm" aria-expanded="false" aria-controls="candidateForm">Novo candidato</button>
+        </div>
+        <div class="collapse border-top" id="candidateForm">
+          <div class="p-3">
+            <div class="alert d-none" id="candidateAlert"></div>
+            <form id="candidateCreateForm" class="row g-3">
+              <div class="col-md-6">
+                <label for="candidateName" class="form-label">Nome</label>
+                <input type="text" class="form-control" id="candidateName" placeholder="Nome completo" required />
+              </div>
+              <div class="col-md-3">
+                <label for="candidateRegistration" class="form-label">Matrícula</label>
+                <input type="text" class="form-control" id="candidateRegistration" placeholder="12345" required />
+              </div>
+              <div class="col-md-3">
+                <label for="candidateCommission" class="form-label">Comissão</label>
+                <input type="text" class="form-control" id="candidateCommission" placeholder="CIPA-01" required />
+              </div>
+              <div class="col-12">
+                <button type="submit" id="candidateSubmit" class="btn btn-primary">Adicionar</button>
+              </div>
+            </form>
+          </div>
         </div>
         <div class="table-responsive">
           <table class="table table-hover mb-0 align-middle">
@@ -100,8 +133,27 @@
 
     <div class="col-lg-5">
       <div class="card shadow-sm border-0 mb-4">
-        <div class="card-header bg-white py-3">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
           <h2 class="h5 mb-0">Equipe de mesários</h2>
+          <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#pollWorkerForm" aria-expanded="false" aria-controls="pollWorkerForm">Novo mesário</button>
+        </div>
+        <div class="collapse border-top" id="pollWorkerForm">
+          <div class="p-3">
+            <div class="alert d-none" id="pollWorkerAlert"></div>
+            <form id="pollWorkerCreateForm" class="row g-3">
+              <div class="col-md-7">
+                <label for="pollWorkerName" class="form-label">Nome</label>
+                <input type="text" class="form-control" id="pollWorkerName" placeholder="Nome completo" required />
+              </div>
+              <div class="col-md-5">
+                <label for="pollWorkerRegistration" class="form-label">Matrícula</label>
+                <input type="text" class="form-control" id="pollWorkerRegistration" placeholder="12345" required />
+              </div>
+              <div class="col-12">
+                <button type="submit" id="pollWorkerSubmit" class="btn btn-primary">Adicionar</button>
+              </div>
+            </form>
+          </div>
         </div>
         <ul class="list-group list-group-flush">
           {% if poll_workers %}
@@ -119,3 +171,172 @@
     </div>
   </div>
 {% endblock %}
+{% block scripts %}
+  <script>
+    (function () {
+      // Controles de estado da sessão
+      const sessionId = {{ session.id }};
+      const startBtn = document.getElementById('start-session');
+      const closeBtn = document.getElementById('close-session');
+
+      async function postAction(url) {
+        const resp = await fetch(url, { method: 'POST' });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          throw new Error(data.detail || 'Falha na operação.');
+        }
+      }
+
+      startBtn?.addEventListener('click', async () => {
+        try {
+          startBtn.disabled = true;
+          startBtn.textContent = 'Iniciando...';
+          await postAction(`/api/sessions/${sessionId}/start`);
+          window.location.reload();
+        } catch (e) {
+          alert(e.message || 'Não foi possível iniciar a sessão.');
+          startBtn.disabled = false;
+          startBtn.textContent = 'Iniciar votação';
+        }
+      });
+
+      closeBtn?.addEventListener('click', async () => {
+        try {
+          closeBtn.disabled = true;
+          closeBtn.textContent = 'Encerrando...';
+          await postAction(`/api/sessions/${sessionId}/close`);
+          window.location.reload();
+        } catch (e) {
+          alert(e.message || 'Não foi possível encerrar a sessão.');
+          closeBtn.disabled = false;
+          closeBtn.textContent = 'Encerrar votação';
+        }
+      });
+
+      // Formulário de novo candidato
+      const form = document.getElementById('candidateCreateForm');
+      if (!form) return;
+
+      const alertBox = document.getElementById('candidateAlert');
+      const submitBtn = document.getElementById('candidateSubmit');
+      const nameInput = document.getElementById('candidateName');
+      const regInput = document.getElementById('candidateRegistration');
+      const comInput = document.getElementById('candidateCommission');
+
+      function showAlert(message, type) {
+        alertBox.textContent = message;
+        alertBox.classList.remove('d-none', 'alert-success', 'alert-danger');
+        alertBox.classList.add(type === 'error' ? 'alert-danger' : 'alert-success');
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Salvando...';
+        alertBox.classList.add('d-none');
+        try {
+          const payload = {
+            name: nameInput.value.trim(),
+            registration: regInput.value.trim(),
+            commission_number: comInput.value.trim(),
+          };
+          const resp = await fetch(`/api/sessions/${sessionId}/candidates`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (!resp.ok) {
+            const data = await resp.json().catch(() => ({}));
+            throw new Error(data.detail || 'Falha ao cadastrar candidato.');
+          }
+
+      // Formul�rio de novo mes�rio
+      const pwForm = document.getElementById("pollWorkerCreateForm");
+      const pwAlert = document.getElementById("pollWorkerAlert");
+      const pwSubmit = document.getElementById("pollWorkerSubmit");
+      const pwName = document.getElementById("pollWorkerName");
+      const pwReg = document.getElementById("pollWorkerRegistration");
+      if (pwForm) {
+        function showPWAlert(message, type) {
+          pwAlert.textContent = message;
+          pwAlert.classList.remove("d-none", "alert-success", "alert-danger");
+          pwAlert.classList.add(type === "error" ? "alert-danger" : "alert-success");
+        }
+        pwForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          pwSubmit.disabled = true;
+          pwSubmit.textContent = "Salvando...";
+          pwAlert.classList.add("d-none");
+          try {
+            const payload = { name: pwName.value.trim(), registration: pwReg.value.trim() };
+            const resp = await fetch(`/api/sessions/${sessionId}/poll_workers`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            if (!resp.ok) {
+              const data = await resp.json().catch(() => ({}));
+              throw new Error(data.detail || "Falha ao cadastrar mes�rio.");
+            }
+            showPWAlert("Mes�rio cadastrado com sucesso!", "success");
+            setTimeout(() => window.location.reload(), 700);
+          } catch (err) {
+            showPWAlert(err.message || "Erro inesperado.", "error");
+          } finally {
+            pwSubmit.disabled = false;
+            pwSubmit.textContent = "Adicionar";
+          }
+        });
+      }
+          showAlert('Candidato cadastrado com sucesso!', 'success');
+          setTimeout(() => window.location.reload(), 700);
+        } catch (err) {
+          showAlert(err.message || 'Erro inesperado.', 'error');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Adicionar';
+        }
+      });
+
+      // Formul�rio de novo mes�rio (ajustado)
+      const pwForm = document.getElementById("pollWorkerCreateForm");
+      const pwAlert = document.getElementById("pollWorkerAlert");
+      const pwSubmit = document.getElementById("pollWorkerSubmit");
+      const pwName = document.getElementById("pollWorkerName");
+      const pwReg = document.getElementById("pollWorkerRegistration");
+      if (pwForm) {
+        function showPWAlert(message, type) {
+          pwAlert.textContent = message;
+          pwAlert.classList.remove("d-none", "alert-success", "alert-danger");
+          pwAlert.classList.add(type === "error" ? "alert-danger" : "alert-success");
+        }
+        pwForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          pwSubmit.disabled = true;
+          pwSubmit.textContent = "Salvando...";
+          pwAlert.classList.add("d-none");
+          try {
+            const payload = { name: pwName.value.trim(), registration: pwReg.value.trim() };
+            const resp = await fetch(`/api/sessions/${sessionId}/poll_workers`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            if (!resp.ok) {
+              const data = await resp.json().catch(() => ({}));
+              throw new Error(data.detail || "Falha ao cadastrar mes�rio.");
+            }
+            showPWAlert("Mes�rio cadastrado com sucesso!", "success");
+            setTimeout(() => window.location.reload(), 700);
+          } catch (err) {
+            showPWAlert(err.message || "Erro inesperado.", "error");
+          } finally {
+            pwSubmit.disabled = false;
+            pwSubmit.textContent = "Adicionar";
+          }
+        });
+      }
+    })();
+  </script>
+{% endblock %}
+

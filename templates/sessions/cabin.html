@@ -113,6 +113,57 @@
       }
       confirmButton.disabled = true;
       confirmButton.textContent = "Enviando...";
+      function playSuccess() {
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          const ctx = new AudioCtx();
+
+          const now = ctx.currentTime;
+
+          // 1️⃣ Primeira nota — grave e curta
+          const osc1 = ctx.createOscillator();
+          const gain1 = ctx.createGain();
+          osc1.type = "triangle";
+          osc1.frequency.setValueAtTime(440, now); // Lá3
+          gain1.gain.setValueAtTime(0.0001, now);
+          gain1.gain.exponentialRampToValueAtTime(0.6, now + 0.02);
+          gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+          osc1.connect(gain1).connect(ctx.destination);
+          osc1.start(now);
+          osc1.stop(now + 0.35);
+
+          // 2️⃣ Segunda nota — aguda e mais longa
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.type = "square";
+          osc2.frequency.setValueAtTime(880, now + 0.25); // sobe uma oitava
+          gain2.gain.setValueAtTime(0.0001, now + 0.25);
+          gain2.gain.exponentialRampToValueAtTime(0.8, now + 0.3);
+          gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
+          osc2.connect(gain2).connect(ctx.destination);
+          osc2.start(now + 0.25);
+          osc2.stop(now + 0.9);
+
+          // 3️⃣ Um leve “brilho” final
+          const osc3 = ctx.createOscillator();
+          const gain3 = ctx.createGain();
+          osc3.type = "sine";
+          osc3.frequency.setValueAtTime(1320, now + 0.8); // harmônico
+          gain3.gain.setValueAtTime(0.0001, now + 0.8);
+          gain3.gain.exponentialRampToValueAtTime(0.4, now + 0.82);
+          gain3.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+          osc3.connect(gain3).connect(ctx.destination);
+          osc3.start(now + 0.8);
+          osc3.stop(now + 1.3);
+
+          // Fechar o contexto após 1.5s
+          setTimeout(() => {
+            ctx.close().catch(() => {});
+          }, 1500);
+        } catch (err) {
+          console.error("Erro ao tocar som de confirmação:", err);
+        }
+      }
       try {
         const response = await fetch(`/api/sessions/${sessionId}/votes`, {
           method: "POST",
@@ -122,6 +173,7 @@
         if (!response.ok) {
           throw new Error("Falha ao registrar o voto.");
         }
+        playSuccess();
         permitAlert.classList.replace("alert-success", "alert-info");
         permitAlert.textContent = "Voto registrado com sucesso! Aguarde o próximo token.";
         permitInput.value = "";

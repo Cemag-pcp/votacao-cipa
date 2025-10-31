@@ -69,6 +69,31 @@
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
+    <script>
+      (function () {
+        function formatAllDates() {
+          const nodes = document.querySelectorAll('[data-dt]');
+          nodes.forEach((el) => {
+            const iso = el.getAttribute('data-dt');
+            if (!iso) return;
+            const d = new Date(iso);
+            if (isNaN(d)) return;
+            try {
+              el.textContent = d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+            } catch (_) {
+              // fallback
+              const pad = (n) => String(n).padStart(2, '0');
+              el.textContent = `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            }
+          });
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', formatAllDates);
+        } else {
+          formatAllDates();
+        }
+      })();
+    </script>
     {% block scripts %}{% endblock %}
   </body>
 </html>

@@ -62,6 +62,12 @@ def list_sessions(
     return templates.TemplateResponse("sessions/list.html", context)
 
 
+@router.get("/sessions/new", response_class=HTMLResponse)
+def new_session(request: Request) -> HTMLResponse:
+    context = {"request": request}
+    return templates.TemplateResponse("sessions/create.html", context)
+
+
 @router.get("/sessions/{session_id}", response_class=HTMLResponse)
 def session_detail(
     session_id: int, request: Request, db_session: Session = Depends(get_session)

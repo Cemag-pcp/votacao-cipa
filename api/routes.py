@@ -81,7 +81,7 @@ def start_session(session_id: int, session: Session = Depends(get_session)) -> V
         raise HTTPException(status_code=400, detail="Session already in progress")
 
     voting_session.status = SessionStatus.IN_PROGRESS
-    voting_session.start_time = datetime.utcnow()
+    voting_session.start_time = datetime.now()
     session.add(voting_session)
     session.commit()
     session.refresh(voting_session)
@@ -95,7 +95,7 @@ def close_session(session_id: int, session: Session = Depends(get_session)) -> V
         raise HTTPException(status_code=400, detail="Session must be in progress to be closed")
 
     voting_session.status = SessionStatus.CLOSED
-    voting_session.end_time = datetime.utcnow()
+    voting_session.end_time = datetime.now()
     session.add(voting_session)
     session.commit()
     session.refresh(voting_session)
@@ -153,7 +153,7 @@ async def create_vote_permit(
 ) -> PermitRead:
     voting_session = _ensure_session_exists(session, session_id)
     if voting_session.status != SessionStatus.IN_PROGRESS:
-        raise HTTPException(status_code=400, detail="Session is not open for voting")
+        raise HTTPException(status_code=400, detail="Sessão não está aberta para votação!")
 
     token = authorization_manager.generate_token()
     permit = VotePermit(token=token, session_id=session_id)
@@ -235,7 +235,7 @@ async def mesario_websocket(session_id: int, websocket: WebSocket) -> None:
             message = await websocket.receive_json()
             action = message.get("action")
             if action == "authorize":
-                from ..database import session_scope
+                from database import session_scope
 
                 with session_scope() as db_session:
                     voting_session = _ensure_session_exists(db_session, session_id)
@@ -243,7 +243,7 @@ async def mesario_websocket(session_id: int, websocket: WebSocket) -> None:
                         await websocket.send_json(
                             {
                                 "type": "error",
-                                "detail": "Session is not open for voting",
+                                "detail": "Sessão não está aberta para votação!",
                             }
                         )
                         continue

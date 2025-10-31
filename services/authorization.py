@@ -7,7 +7,6 @@ from fastapi import WebSocket
 
 from models import VotePermit
 
-
 class AuthorizationChannel:
     def __init__(self) -> None:
         self._cabins: set[WebSocket] = set()

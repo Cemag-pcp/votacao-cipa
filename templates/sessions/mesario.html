@@ -18,8 +18,8 @@
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body">
           <h2 class="h5 mb-3">Emitir autorização</h2>
-          <p class="text-muted">Use o botão abaixo para gerar um novo token de votação para o próximo colaborador.</p>
-          <button class="btn btn-primary" id="authorize-button">Gerar token</button>
+          <p class="text-muted">Use o botão abaixo para autorizar o próximo colaborador a votar.</p>
+          <button class="btn btn-primary" id="authorize-button">Autorizar</button>
           <div class="alert alert-info mt-3 d-none" id="authorization-alert"></div>
         </div>
       </div>
@@ -73,9 +73,9 @@
       item.className = "list-group-item d-flex justify-content-between align-items-center";
       item.innerHTML = `<span>${message}</span><span class="badge text-bg-success">Enviado</span>`;
       authorizationList.prepend(item);
-      showAlert("Token gerado com sucesso!", false);
+      showAlert("Autorizado com sucesso!", false);
       authorizeButton.disabled = false;
-      authorizeButton.textContent = "Gerar token";
+      authorizeButton.textContent = "Autorizar";
     }
 
     function showAlert(message, isError) {

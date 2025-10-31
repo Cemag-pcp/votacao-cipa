@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Nova Sessão · Votação CIPA{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-1">Criar nova sessão</h1>
+      <p class="text-muted mb-0">Defina o código e a quantidade prevista de votos.</p>
+    </div>
+    <div class="btn-group">
+      <a class="btn btn-outline-primary" href="/sessions">Voltar</a>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-7">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <div class="alert d-none" id="sessionAlert"></div>
+          <form id="sessionForm" class="row g-3">
+            <div class="col-md-6">
+              <label for="sessionCode" class="form-label">Código da sessão</label>
+              <input type="text" class="form-control" id="sessionCode" placeholder="2025.1" required>
+              <div class="form-text">Ex.: ano.período (livre).</div>
+            </div>
+            <div class="col-md-6">
+              <label for="expectedVotes" class="form-label">Votos previstos</label>
+              <input type="number" min="0" step="1" class="form-control" id="expectedVotes" placeholder="0" value="0" required>
+            </div>
+            <div class="col-12">
+              <button type="submit" id="saveButton" class="btn btn-primary">Salvar sessão</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    (function() {
+      const form = document.getElementById('sessionForm');
+      const codeInput = document.getElementById('sessionCode');
+      const expectedInput = document.getElementById('expectedVotes');
+      const saveBtn = document.getElementById('saveButton');
+      const alertBox = document.getElementById('sessionAlert');
+
+      function showAlert(message, type) {
+        alertBox.textContent = message;
+        alertBox.classList.remove('d-none', 'alert-success', 'alert-danger');
+        alertBox.classList.add(type === 'error' ? 'alert-danger' : 'alert-success');
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const code = codeInput.value.trim();
+        const expected = Number(expectedInput.value);
+        if (!code) {
+          showAlert('Informe um código para a sessão.', 'error');
+          return;
+        }
+        if (!Number.isFinite(expected) || expected < 0) {
+          showAlert('Votos previstos deve ser um número válido maior ou igual a 0.', 'error');
+          return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Salvando...';
+        alertBox.classList.add('d-none');
+        try {
+          const resp = await fetch('/api/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, expected_votes: expected })
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            throw new Error(data.detail || 'Falha ao criar sessão.');
+          }
+          showAlert('Sessão criada com sucesso! Redirecionando...', 'success');
+          const newId = data.id;
+          setTimeout(() => {
+            if (newId) {
+              window.location.href = `/sessions/${newId}`;
+            } else {
+              window.location.href = '/sessions';
+            }
+          }, 600);
+        } catch (err) {
+          showAlert(err.message || 'Erro inesperado ao salvar.', 'error');
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Salvar sessão';
+        }
+      });
+    })();
+  </script>
+{% endblock %}
+

@@ -15,7 +15,7 @@ def init_db() -> None:
 @contextmanager
 def session_scope() -> Iterator[Session]:
     """Provide a transactional scope around a series of operations."""
-    session = Session(engine)
+    session = Session(engine, expire_on_commit=False)
     try:
         yield session
         session.commit()
@@ -28,5 +28,5 @@ def session_scope() -> Iterator[Session]:
 
 def get_session() -> Iterator[Session]:
     """FastAPI dependency that yields a database session."""
-    with Session(engine) as session:
+    with Session(engine, expire_on_commit=False) as session:
         yield session
