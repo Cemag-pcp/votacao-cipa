@@ -17,7 +17,7 @@ pip install -r requirements.txt
 ## Execução
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn main:app --reload
 ```
 
 O servidor ficará disponível em `http://127.0.0.1:8000`. A documentação automática pode ser acessada em `http://127.0.0.1:8000/docs`.

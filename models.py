@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlmodel import Field, Relationship, SQLModel
@@ -30,6 +30,7 @@ class Candidate(SQLModel, table=True):
     name: str
     registration: str
     commission_number: str
+    photo_url: Optional[str] = None
 
     session_id: int = Field(foreign_key="votingsession.id")
     session: "VotingSession" = Relationship(back_populates="candidates")
@@ -48,7 +49,7 @@ class PollWorker(SQLModel, table=True):
 class VotePermit(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     token: str = Field(index=True, unique=True)
-    issued_at: datetime = Field(default_factory=datetime.utcnow)
+    issued_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     used_at: Optional[datetime] = Field(default=None)
     used: bool = Field(default=False)
 
@@ -59,13 +60,13 @@ class VotePermit(SQLModel, table=True):
 
 class Vote(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
 
     session_id: int = Field(foreign_key="votingsession.id")
     session: "VotingSession" = Relationship(back_populates="votes")
 
-    candidate_id: int = Field(foreign_key="candidate.id")
-    candidate: "Candidate" = Relationship(back_populates="votes")
+    candidate_id: Optional[int] = Field(default=None, foreign_key="candidate.id")
+    candidate: Optional["Candidate"] = Relationship(back_populates="votes")
 
     permit_id: int = Field(foreign_key="votepermit.id", unique=True)
     permit: "VotePermit" = Relationship(back_populates="vote")

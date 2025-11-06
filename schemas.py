@@ -36,6 +36,7 @@ class CandidateRead(BaseModel):
     name: str
     registration: str
     commission_number: str
+    photo_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -71,14 +72,32 @@ class PermitRead(BaseModel):
         from_attributes = True
 
 
+class PermitListItem(BaseModel):
+    token: str
+    issued_at: datetime
+    used: bool
+    used_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 class VoteRequest(BaseModel):
-    candidate_id: int
+    candidate_id: Optional[int] = None
+    null_vote: bool = False
     permit_token: str
+
+    def validate(self):
+        # Ensure exactly one of candidate_id or null_vote is provided
+        has_candidate = self.candidate_id is not None
+        if has_candidate == self.null_vote:
+            raise ValueError("Provide either candidate_id or set null_vote true, not both")
+        return self
 
 
 class VoteRead(BaseModel):
     id: int
-    candidate_id: int
+    candidate_id: Optional[int]
     created_at: datetime
 
     class Config:
@@ -86,7 +105,7 @@ class VoteRead(BaseModel):
 
 
 class VoteSummary(BaseModel):
-    candidate_id: int
+    candidate_id: Optional[int]
     candidate_name: str
     total_votes: int
 

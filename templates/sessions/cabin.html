@@ -3,18 +3,54 @@
 {% block title %}Cabine · Sessão {{ session.code }}{% endblock %}
 
 {% block content %}
+  <style>
+    .candidate-button {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-align: left;
+      white-space: normal;
+    }
+    .candidate-photo {
+      width: 60px;
+      height: 100px;
+      object-fit: cover;
+      border-radius: 8px;
+      flex: 0 0 auto;
+    }
+    .expand-photo-button { white-space: nowrap; }
+    /* Overlay simples para foto ampliada */
+    .photo-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1050;
+    }
+    .photo-overlay.show { display: flex; }
+    .photo-overlay img {
+      max-width: 90vw;
+      max-height: 90vh;
+      border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+  </style>
   <div class="row g-4 align-items-center mb-4">
     <div class="col-lg-8">
       <h1 class="h3 mb-2">Cabine de votação</h1>
-      <p class="text-muted mb-0">Selecione um candidato para registrar o voto na sessão <strong>{{ session.code }}</strong>.</p>
+      <p class="text-muted mb-0">Você está na cabine de votação para a sessão <strong>{{ session.code }}</strong>. Você tem direito a apenas 1 voto.</p>
     </div>
+    {% if not kiosk_mode %}
     <div class="col-lg-4 text-lg-end">
       <a class="btn btn-outline-primary" href="/sessions/{{ session.id }}">Voltar aos detalhes</a>
     </div>
+    {% endif %}
   </div>
 
   <div class="alert alert-info" id="permit-alert">
-    Aguarde o mesário liberar o acesso. O token aparecerá automaticamente quando disponível.
+    Aguarde o mesário liberar o acesso.
   </div>
 
   <div class="row g-4">
@@ -22,18 +58,35 @@
       <div class="card shadow-sm border-0">
         <div class="card-body">
           <h2 class="h5 mb-3">Candidatos</h2>
+          <div class="mb-3">
+            <label for="commission-filter" class="form-label">Filtrar por número da comissão</label>
+            <input type="text" class="form-control" id="commission-filter" placeholder="Ex.: 12, 01, 05, 10..." inputmode="numeric" />
+          </div>
           <form id="vote-form" class="d-grid gap-2">
             {% if candidates %}
               {% for candidate in candidates %}
-                <button
+                <div class="d-flex align-items-stretch gap-2 candidate-row" data-commission="{{ candidate.commission_number or '' }}">
+                  <button
                   type="button"
-                  class="btn btn-outline-primary btn-lg candidate-button"
+                  class="btn btn-outline-primary btn-lg candidate-button flex-grow-1"
                   data-candidate-id="{{ candidate.id }}"
                 >
+                  {% if candidate.photo_url %}
+                    <img src="{{ candidate.photo_url }}" alt="Foto de {{ candidate.name }}" class="candidate-photo" />
+                  {% endif %}
                   {{ candidate.name }}
-                  <small class="d-block text-muted">Matrícula {{ candidate.registration }}</small>
-                </button>
+                  {% if candidate.commission_number %}
+                  <small class="d-block text-muted">{{ candidate.commission_number }}</small>
+                  {% endif %}
+                  </button>
+                  {% if candidate.photo_url %}
+                    <button type="button" class="btn btn-outline-secondary btn-lg expand-photo-button" data-photo-url="{{ candidate.photo_url }}" aria-label="Expandir foto de {{ candidate.name }}">Expandir foto</button>
+                  {% endif %}
+                </div>
               {% endfor %}
+              <div>
+                <button type="button" class="btn btn-outline-danger btn-lg null-vote-button w-100">Voto BRANCO (Não será computado para nenhum dos candidatos)</button>
+              </div>
             {% else %}
               <p class="text-muted">Nenhum candidato cadastrado para esta sessão.</p>
             {% endif %}
@@ -44,17 +97,17 @@
     <div class="col-lg-6">
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body">
-          <h2 class="h5 mb-3">Status da cabine</h2>
+          <h2 class="h5 mb-3">Confirmação do voto. Lembre-se o voto é único.</h2>
           <dl class="row mb-0">
             <dt class="col-sm-4">Sessão</dt>
             <dd class="col-sm-8">{{ session.code }}</dd>
-            <dt class="col-sm-4">Status</dt>
+            <!-- <dt class="col-sm-4">Status</dt>
             <dd class="col-sm-8">{{ session.status.value|replace('_', ' ')|title }}</dd>
             <dt class="col-sm-4">Votos restantes</dt>
-            <dd class="col-sm-8">{{ session.remaining_votes }}</dd>
+            <dd class="col-sm-8">{{ session.remaining_votes }}</dd> -->
           </dl>
           <div class="mt-4">
-            <label class="form-label">Token recebido</label>
+            <label class="form-label">Autorização recebida</label>
             <input type="text" class="form-control" id="permit-token" readonly />
           </div>
           <div class="mt-3">
@@ -64,18 +117,30 @@
       </div>
     </div>
   </div>
+  <!-- Overlay para ampliar foto -->
+  <div id="photo-overlay" class="photo-overlay" role="dialog" aria-modal="true" aria-label="Foto ampliada">
+    <button type="button" class="btn-close btn-close-white photo-overlay-close" aria-label="Fechar" style="position:absolute;top:16px;right:16px;"></button>
+    <img id="photo-overlay-img" src="" alt="Foto ampliada" />
+  </div>
 {% endblock %}
 
 {% block scripts %}
   <script>
     const sessionId = {{ session.id }};
     let selectedCandidate = null;
+    let selectedNull = false;
     let permitToken = null;
 
     const permitAlert = document.getElementById("permit-alert");
     const permitInput = document.getElementById("permit-token");
     const confirmButton = document.getElementById("confirm-button");
+    const commissionFilter = document.getElementById("commission-filter");
+    const candidateRows = document.querySelectorAll('.candidate-row');
     const candidateButtons = document.querySelectorAll(".candidate-button");
+    const nullVoteButton = document.querySelector(".null-vote-button");
+    const expandButtons = document.querySelectorAll(".expand-photo-button");
+    const photoOverlay = document.getElementById("photo-overlay");
+    const photoOverlayImg = document.getElementById("photo-overlay-img");
 
     const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/ws/sessions/${sessionId}/cabine`);
 
@@ -85,10 +150,31 @@
         permitToken = data.token;
         permitInput.value = permitToken;
         permitAlert.classList.replace("alert-info", "alert-success");
-        permitAlert.textContent = "Token recebido! Selecione um candidato e confirme o voto.";
+        permitAlert.textContent = "Autorização recebida! Selecione um candidato e confirme o voto.";
         updateConfirmButton();
       }
     });
+
+    // Expandir foto em overlay
+    function openPhoto(url, altText) {
+      if (!url) return;
+      photoOverlayImg.src = url;
+      photoOverlayImg.alt = altText || "Foto ampliada";
+      photoOverlay.classList.add("show");
+    }
+    function closePhoto() {
+      photoOverlay.classList.remove("show");
+      photoOverlayImg.src = "";
+    }
+    expandButtons.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openPhoto(btn.dataset.photoUrl, btn.getAttribute("aria-label"));
+      });
+    });
+    document.querySelector(".photo-overlay-close")?.addEventListener("click", closePhoto);
+    photoOverlay.addEventListener("click", (e) => { if (e.target === photoOverlay) closePhoto(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && photoOverlay.classList.contains("show")) closePhoto(); });
 
     socket.addEventListener("close", () => {
       permitAlert.classList.replace("alert-info", "alert-warning");
@@ -99,16 +185,68 @@
       button.addEventListener("click", () => {
         candidateButtons.forEach((btn) => btn.classList.remove("active", "btn-primary"));
         candidateButtons.forEach((btn) => btn.classList.add("btn-outline-primary"));
+        if (nullVoteButton) {
+          nullVoteButton.classList.remove("btn-danger", "active");
+          nullVoteButton.classList.add("btn-outline-danger");
+        }
         button.classList.remove("btn-outline-primary");
         button.classList.add("btn-primary", "active");
         selectedCandidate = button.dataset.candidateId;
+        selectedNull = false;
         updateConfirmButton();
       });
     });
 
+    nullVoteButton?.addEventListener("click", () => {
+      candidateButtons.forEach((btn) => {
+        btn.classList.remove("active", "btn-primary");
+        btn.classList.add("btn-outline-primary");
+      });
+      nullVoteButton.classList.remove("btn-outline-danger");
+      nullVoteButton.classList.add("btn-danger", "active");
+      selectedCandidate = null;
+      selectedNull = true;
+      updateConfirmButton();
+    });
+
+    function normalizeCommission(value) {
+      if (!value) return '';
+      return String(value).toLowerCase();
+    }
+
+    function applyCommissionFilter() {
+      const query = normalizeCommission(commissionFilter?.value?.trim() || '');
+      let selectedStillVisible = false;
+      candidateRows.forEach((row) => {
+        const commission = normalizeCommission(row.dataset.commission || '');
+        const match = !query || commission.includes(query);
+        if (match) {
+          row.classList.remove('d-none');
+          if (selectedCandidate) {
+            const btn = row.querySelector('.candidate-button');
+            if (btn && btn.dataset.candidateId === String(selectedCandidate)) {
+              selectedStillVisible = true;
+            }
+          }
+        } else {
+          row.classList.add('d-none');
+        }
+      });
+      if (selectedCandidate && !selectedStillVisible) {
+        candidateButtons.forEach((btn) => {
+          btn.classList.remove("active", "btn-primary");
+          btn.classList.add("btn-outline-primary");
+        });
+        selectedCandidate = null;
+        updateConfirmButton();
+      }
+    }
+
+    commissionFilter?.addEventListener('input', applyCommissionFilter);
+
     confirmButton.addEventListener("click", async (event) => {
       event.preventDefault();
-      if (!selectedCandidate || !permitToken) {
+      if (!(selectedCandidate || selectedNull) || !permitToken) {
         return;
       }
       confirmButton.disabled = true;
@@ -168,14 +306,17 @@
         const response = await fetch(`/api/sessions/${sessionId}/votes`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ candidate_id: Number(selectedCandidate), permit_token: permitToken })
+          body: JSON.stringify(selectedNull
+            ? { null_vote: true, permit_token: permitToken }
+            : { candidate_id: Number(selectedCandidate), permit_token: permitToken }
+          )
         });
         if (!response.ok) {
           throw new Error("Falha ao registrar o voto.");
         }
         playSuccess();
         permitAlert.classList.replace("alert-success", "alert-info");
-        permitAlert.textContent = "Voto registrado com sucesso! Aguarde o próximo token.";
+        permitAlert.textContent = "Aguarde o mesário liberar.";
         permitInput.value = "";
         permitToken = null;
         candidateButtons.forEach((btn) => {
@@ -183,6 +324,16 @@
           btn.classList.add("btn-outline-primary");
         });
         selectedCandidate = null;
+        if (nullVoteButton) {
+          nullVoteButton.classList.remove("btn-danger", "active");
+          nullVoteButton.classList.add("btn-outline-danger");
+        }
+        selectedNull = false;
+        // Resetar filtro após votar
+        if (commissionFilter) {
+          commissionFilter.value = '';
+          applyCommissionFilter();
+        }
       } catch (error) {
         permitAlert.classList.replace("alert-info", "alert-danger");
         permitAlert.textContent = error.message || "Ocorreu um erro ao registrar o voto.";
@@ -193,7 +344,49 @@
     });
 
     function updateConfirmButton() {
-      confirmButton.disabled = !(selectedCandidate && permitToken);
+      confirmButton.disabled = !((selectedCandidate || selectedNull) && permitToken);
     }
+  </script>
+  <script>
+    // Kiosk/Urna: impedir sair/atualizar/navegar
+    (function () {
+      // Previne voltar no histórico (mantém na página)
+      try {
+        history.pushState(null, '', location.href);
+        window.addEventListener('popstate', function () {
+          history.pushState(null, '', location.href);
+        });
+      } catch (_) {}
+
+      // Bloqueia atalhos comuns de saída/refresh/navegação
+      window.addEventListener('keydown', function (e) {
+        const k = (e.key || '').toLowerCase();
+        const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+        const isEditable = (e.target && (e.target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select'));
+
+        // F5 / Ctrl+R / Cmd+R
+        if (k === 'f5' || ((e.ctrlKey || e.metaKey) && k === 'r')) { e.preventDefault(); return; }
+        // Ctrl+W / Cmd+W (fechar aba)
+        if ((e.ctrlKey || e.metaKey) && k === 'w') { e.preventDefault(); return; }
+        // Ctrl+L / Cmd+L (foco na barra de endereço)
+        if ((e.ctrlKey || e.metaKey) && k === 'l') { e.preventDefault(); return; }
+        // Ctrl+T / Ctrl+N / Ctrl+Shift+N (novas abas/janelas)
+        if ((e.ctrlKey || e.metaKey) && (k === 't' || k === 'n')) { e.preventDefault(); return; }
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && k === 'n') { e.preventDefault(); return; }
+        // Alt+← / Alt+→ (navegação histórico)
+        if (e.altKey && (k === 'arrowleft' || k === 'arrowright')) { e.preventDefault(); return; }
+        // Backspace fora de campos editáveis (não navegar)
+        if (k === 'backspace' && !isEditable) { e.preventDefault(); return; }
+      }, { capture: true });
+
+      // Bloqueia menu de contexto (clique direito)
+      window.addEventListener('contextmenu', function (e) { e.preventDefault(); }, { capture: true });
+
+      // Aviso/bloqueio ao tentar recarregar/fechar
+      window.addEventListener('beforeunload', function (e) {
+        e.preventDefault();
+        e.returnValue = '';
+      });
+    })();
   </script>
 {% endblock %}

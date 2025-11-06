@@ -45,10 +45,27 @@
 
     const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/ws/sessions/${sessionId}/mesario`);
 
+    // Carregar tokens já gerados ao abrir
+    (async function loadPermits() {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/permits`);
+        if (!res.ok) throw new Error('Falha ao carregar autorizações');
+        const items = await res.json();
+        items.forEach((item) => {
+          // item: { token, issued_at, used, used_at }
+          ensureItem(item.token, item.issued_at, item.used ? item.used_at : null, item.used);
+        });
+      } catch (e) {
+        showAlert('Não foi possível carregar autorizações anteriores.', true);
+      }
+    })();
+
     socket.addEventListener("message", (event) => {
       const data = JSON.parse(event.data);
       if (data.type === "authorized") {
-        showAuthorization(`Token: ${data.token}`);
+        showAuthorization(data.token, data.issued_at);
+      } else if (data.type === "vote_registered") {
+        markVoted(data.token, data);
       } else if (data.type === "error") {
         showAlert(data.detail, true);
       }
@@ -68,14 +85,81 @@
       }
     });
 
-    function showAuthorization(message) {
-      const item = document.createElement("li");
-      item.className = "list-group-item d-flex justify-content-between align-items-center";
-      item.innerHTML = `<span>${message}</span><span class="badge text-bg-success">Enviado</span>`;
+    function formatDt(iso) {
+      if (!iso) return "-";
+      // Tratar strings ISO sem timezone como UTC
+      if (/^\d{4}-\d{2}-\d{2}T/.test(iso) && !/[zZ]|[\+\-]\d{2}:?\d{2}$/.test(iso)) {
+        iso = iso + 'Z';
+      }
+      try {
+        const d = new Date(iso);
+        return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+      } catch (_) {
+        return iso;
+      }
+    }
+
+    function ensureItem(token, issuedAt, votedAt, isVoted) {
+      let li = authorizationList.querySelector(`li[data-token="${CSS.escape(String(token))}"]`);
+      if (!li) {
+        li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-start gap-3';
+        li.dataset.token = String(token);
+        li.innerHTML = `
+          <span>
+            <strong>Token: ${token}</strong>
+            <small class="d-block text-muted">Gerado: <span data-role="issued-at"></span></small>
+            <small class="d-block text-muted"><span data-role="voted-at"></span></small>
+          </span>
+          <span class="badge" data-role="status"></span>
+        `;
+        authorizationList.appendChild(li);
+      }
+      const issuedNode = li.querySelector('[data-role="issued-at"]');
+      const votedNode = li.querySelector('[data-role="voted-at"]');
+      const statusNode = li.querySelector('[data-role="status"]');
+      if (issuedNode) issuedNode.textContent = formatDt(issuedAt);
+      if (votedNode) votedNode.textContent = votedAt ? `Votado em: ${formatDt(votedAt)}` : '';
+      if (statusNode) {
+        statusNode.textContent = isVoted ? 'Votado' : 'Enviado';
+        statusNode.className = 'badge ' + (isVoted ? 'text-bg-secondary' : 'text-bg-success');
+      }
+      return li;
+    }
+
+    function showAuthorization(token, issuedAt) {
+      const item = ensureItem(token, issuedAt, null, false);
+      // Coloca mais recente no topo
       authorizationList.prepend(item);
       showAlert("Autorizado com sucesso!", false);
       authorizeButton.disabled = false;
       authorizeButton.textContent = "Autorizar";
+    }
+
+    function markVoted(token, data) {
+      const items = authorizationList.querySelectorAll("li");
+      let found = null;
+      items.forEach((li) => {
+        if (!found && li.dataset.token === String(token)) {
+          found = li;
+        }
+      });
+      const label = (data && data.null_vote) ? "Votado" : "Votado";
+      if (found) {
+        const status = found.querySelector("[data-role=\"status\"]");
+        if (status) {
+          status.textContent = label;
+          status.classList.remove("text-bg-success");
+          status.classList.add("text-bg-secondary");
+        }
+        const votedAtNode = found.querySelector('[data-role="voted-at"]');
+        if (votedAtNode) {
+          votedAtNode.textContent = data && data.used_at ? `Votado em: ${formatDt(data.used_at)}` : '';
+        }
+      } else {
+        const item = ensureItem(token, null, data && data.used_at ? data.used_at : null, true);
+        authorizationList.prepend(item);
+      }
     }
 
     function showAlert(message, isError) {

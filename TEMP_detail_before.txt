@@ -79,7 +79,7 @@
         <div class="collapse border-top" id="candidateForm">
           <div class="p-3">
             <div class="alert d-none" id="candidateAlert"></div>
-            <form id="candidateCreateForm" class="row g-3" enctype="multipart/form-data">
+            <form id="candidateCreateForm" class="row g-3">
               <div class="col-md-6">
                 <label for="candidateName" class="form-label">Nome</label>
                 <input type="text" class="form-control" id="candidateName" placeholder="Nome completo" required />
@@ -92,11 +92,6 @@
                 <label for="candidateCommission" class="form-label">Comissão</label>
                 <input type="text" class="form-control" id="candidateCommission" placeholder="CIPA-01" required />
               </div>
-              <div class="col-md-6">
-                <label for="candidatePhoto" class="form-label">Foto (opcional)</label>
-                <input type="file" class="form-control" id="candidatePhoto" accept="image/*" />
-                <div class="form-text">JPG, PNG ou WEBP.</div>
-              </div>
               <div class="col-12">
                 <button type="submit" id="candidateSubmit" class="btn btn-primary">Adicionar</button>
               </div>
@@ -107,7 +102,6 @@
           <table class="table table-hover mb-0 align-middle">
             <thead class="table-light">
               <tr>
-                <th scope="col">Foto</th>
                 <th scope="col">Nome</th>
                 <th scope="col">Matrícula</th>
                 <th scope="col">Comissão</th>
@@ -118,13 +112,6 @@
               {% if candidates %}
                 {% for candidate in candidates %}
                   <tr>
-                    <td>
-                      {% if candidate.photo_url %}
-                        <img src="{{ candidate.photo_url }}" alt="Foto de {{ candidate.name }}" style="width:42px;height:42px;object-fit:cover;border-radius:50%;" />
-                      {% else %}
-                        &mdash;
-                      {% endif %}
-                    </td>
                     <td>{{ candidate.name }}</td>
                     <td>{{ candidate.registration }}</td>
                     <td>{{ candidate.commission_number }}</td>
@@ -133,18 +120,11 @@
                 {% endfor %}
               {% else %}
                 <tr>
-                  <td colspan="5" class="text-center py-4 text-muted">
+                  <td colspan="4" class="text-center py-4 text-muted">
                     Nenhum candidato cadastrado.
                   </td>
                 </tr>
               {% endif %}
-              <tr>
-                <td>&mdash;</td>
-                <td class="fw-semibold">Voto BRANCO</td>
-                <td></td>
-                <td></td>
-                <td class="text-end fw-semibold">{{ null_votes }}</td>
-              </tr>
             </tbody>
           </table>
         </div>
@@ -270,26 +250,6 @@
             throw new Error(data.detail || 'Falha ao cadastrar candidato.');
           }
 
-          // Photo upload if a file was selected
-          try {
-            const created = await resp.json().catch(() => null);
-            const photoInput = document.getElementById('candidatePhoto');
-            if (created && created.id && photoInput && photoInput.files && photoInput.files[0]) {
-              const fd = new FormData();
-              fd.append('file', photoInput.files[0]);
-              const up = await fetch(`/api/sessions/${sessionId}/candidates/${created.id}/photo`, {
-                method: 'POST',
-                body: fd,
-              });
-              if (!up.ok) {
-                const d = await up.json().catch(() => ({}));
-                console.warn('Falha ao enviar foto:', d.detail || up.statusText);
-              }
-            }
-          } catch (e) {
-            console.warn('Nao foi possivel processar upload da foto:', e);
-          }
-
       // Formul�rio de novo mes�rio
       const pwForm = document.getElementById("pollWorkerCreateForm");
       const pwAlert = document.getElementById("pollWorkerAlert");
@@ -379,4 +339,3 @@
     })();
   </script>
 {% endblock %}
-

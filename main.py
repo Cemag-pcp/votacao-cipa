@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import router as api_router
@@ -34,3 +35,6 @@ app.add_middleware(
 # Inclui as rotas principais
 app.include_router(api_router, prefix="/api")
 app.include_router(frontend_router)
+
+# Servir arquivos enviados (fotos)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

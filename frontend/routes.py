@@ -97,15 +97,22 @@ def session_detail(
                 "name": candidate.name,
                 "registration": candidate.registration,
                 "commission_number": candidate.commission_number,
+                "photo_url": candidate.photo_url,
                 "votes": vote_count,
             }
         )
+
+    null_votes = db_session.exec(
+        select(func.count(Vote.id)).where((Vote.session_id == voting_session.id) & (Vote.candidate_id == None))
+    ).one()
+    null_votes = int(null_votes or 0)
 
     context = {
         "request": request,
         "session": session_data,
         "session_status": SessionStatus,
         "candidates": candidate_votes,
+        "null_votes": null_votes,
         "poll_workers": workers,
     }
     return templates.TemplateResponse("sessions/detail.html", context)
@@ -142,5 +149,7 @@ def session_cabin(
         "request": request,
         "session": _session_overview(db_session, voting_session),
         "candidates": candidates,
+        # Ativa o modo cabine/urna (sem navegação/saída)
+        "kiosk_mode": True,
     }
     return templates.TemplateResponse("sessions/cabin.html", context)

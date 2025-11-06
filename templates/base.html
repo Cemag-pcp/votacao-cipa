@@ -27,6 +27,7 @@
     {% block head %}{% endblock %}
   </head>
   <body>
+    {% if not kiosk_mode %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
       <div class="container">
         <a class="navbar-brand" href="/">Votação CIPA</a>
@@ -53,16 +54,19 @@
         </div>
       </div>
     </nav>
+    {% endif %}
 
     <main class="container py-4">
       {% block content %}{% endblock %}
     </main>
 
+    {% if not kiosk_mode %}
     <footer class="bg-white border-top py-3 mt-auto">
       <div class="container text-center text-muted">
         &copy; {{ now().year }} Comissão Interna de Prevenção de Acidentes
       </div>
     </footer>
+    {% endif %}
 
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
@@ -71,10 +75,18 @@
     ></script>
     <script>
       (function () {
+        function normalizeIsoLikeUtc(iso) {
+          if (!iso) return iso;
+          // Adiciona 'Z' quando n existe timezone, tratando como UTC
+          if (/^\d{4}-\d{2}-\d{2}T/.test(iso) && !/[zZ]|[\+\-]\d{2}:?\d{2}$/.test(iso)) {
+            return iso + 'Z';
+          }
+          return iso;
+        }
         function formatAllDates() {
           const nodes = document.querySelectorAll('[data-dt]');
           nodes.forEach((el) => {
-            const iso = el.getAttribute('data-dt');
+            const iso = normalizeIsoLikeUtc(el.getAttribute('data-dt'));
             if (!iso) return;
             const d = new Date(iso);
             if (isNaN(d)) return;
