@@ -18,7 +18,11 @@
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body">
           <h2 class="h5 mb-3">Emitir autorização</h2>
-          <p class="text-muted">Use o botão abaixo para autorizar o próximo colaborador a votar.</p>
+          <p class="text-muted">Informe a matrícula do eleitor e clique em Autorizar. Cada matrícula só pode ser usada uma única vez por sessão.</p>
+          <div class="mb-3">
+            <label for="registration-input" class="form-label">Matrícula do eleitor</label>
+            <input type="text" class="form-control" id="registration-input" placeholder="Ex.: 123456" autocomplete="off" />
+          </div>
           <button class="btn btn-primary" id="authorize-button">Autorizar</button>
           <div class="alert alert-info mt-3 d-none" id="authorization-alert"></div>
         </div>
@@ -40,6 +44,7 @@
   <script>
     const sessionId = {{ session.id }};
     const authorizeButton = document.getElementById("authorize-button");
+    const registrationInput = document.getElementById("registration-input");
     const authorizationAlert = document.getElementById("authorization-alert");
     const authorizationList = document.getElementById("authorization-list");
 
@@ -77,7 +82,12 @@
 
     authorizeButton?.addEventListener("click", () => {
       if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ action: "authorize" }));
+        const reg = (registrationInput?.value || '').trim();
+        if (!reg) {
+          showAlert("Informe a matrícula do eleitor.", true);
+          return;
+        }
+        socket.send(JSON.stringify({ action: "authorize", registration: reg }));
         authorizeButton.disabled = true;
         authorizeButton.textContent = "Aguardando...";
       } else {
@@ -173,7 +183,7 @@
       }
       if (isError) {
         authorizeButton.disabled = false;
-        authorizeButton.textContent = "Gerar token";
+        authorizeButton.textContent = "Autorizar";
       }
     }
   </script>

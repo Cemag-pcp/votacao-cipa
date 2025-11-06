@@ -61,7 +61,8 @@ class SessionStatusUpdate(BaseModel):
 
 
 class PermitCreate(BaseModel):
-    pass
+    # Matrícula do eleitor a ser autorizada
+    voter_registration: str
 
 
 class PermitRead(BaseModel):

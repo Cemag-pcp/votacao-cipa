@@ -14,6 +14,7 @@ from models import Candidate, PollWorker, SessionStatus, Vote, VotePermit, Votin
 from schemas import (
     CandidateCreate,
     CandidateRead,
+    PermitCreate,
     PermitRead,
     PermitListItem,
     PollWorkerCreate,
@@ -195,14 +196,23 @@ def list_poll_workers(session_id: int, session: Session = Depends(get_session)) 
 
 @router.post("/sessions/{session_id}/permits", response_model=PermitRead, status_code=201)
 async def create_vote_permit(
-    session_id: int, session: Session = Depends(get_session)
+    session_id: int, data: PermitCreate, session: Session = Depends(get_session)
 ) -> PermitRead:
     voting_session = _ensure_session_exists(session, session_id)
     if voting_session.status != SessionStatus.IN_PROGRESS:
         raise HTTPException(status_code=400, detail="Sessão não está aberta para votação!")
 
+    # Verificar se a matrícula já foi utilizada nesta sessão
+    existing = session.exec(
+        select(VotePermit).where(
+            (VotePermit.session_id == session_id) & (VotePermit.voter_registration == data.voter_registration)
+        )
+    ).first()
+    if existing is not None:
+        raise HTTPException(status_code=400, detail="Matrícula já utilizada nesta sessão")
+
     token = authorization_manager.generate_token()
-    permit = VotePermit(token=token, session_id=session_id)
+    permit = VotePermit(token=token, session_id=session_id, voter_registration=data.voter_registration)
     session.add(permit)
     session.commit()
     session.refresh(permit)
@@ -332,8 +342,31 @@ async def mesario_websocket(session_id: int, websocket: WebSocket) -> None:
                             }
                         )
                         continue
+                    voter_registration = (message.get("registration") or "").strip()
+                    if not voter_registration:
+                        await websocket.send_json(
+                            {
+                                "type": "error",
+                                "detail": "Informe a matrícula do eleitor.",
+                            }
+                        )
+                        continue
+                    existing = db_session.exec(
+                        select(VotePermit).where(
+                            (VotePermit.session_id == session_id)
+                            & (VotePermit.voter_registration == voter_registration)
+                        )
+                    ).first()
+                    if existing is not None:
+                        await websocket.send_json(
+                            {
+                                "type": "error",
+                                "detail": "Matrícula já utilizada nesta sessão.",
+                            }
+                        )
+                        continue
                     token = authorization_manager.generate_token()
-                    permit = VotePermit(token=token, session_id=session_id)
+                    permit = VotePermit(token=token, session_id=session_id, voter_registration=voter_registration)
                     db_session.add(permit)
                     db_session.commit()
                     db_session.refresh(permit)

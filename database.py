@@ -13,7 +13,7 @@ def init_db() -> None:
     # Create tables if not present
     SQLModel.metadata.create_all(engine)
 
-    # Lightweight migration: add photo_url to candidate if missing
+    # Lightweight migrations
     with engine.connect() as conn:
         try:
             result = conn.execute(text("PRAGMA table_info('candidate')"))
@@ -22,6 +22,23 @@ def init_db() -> None:
                 conn.execute(text("ALTER TABLE candidate ADD COLUMN photo_url TEXT"))
         except Exception:
             # Best-effort; keep app running even if PRAGMA/ALTER not supported
+            pass
+
+        # Add voter_registration to votepermit and create uniqueness index per session
+        try:
+            result = conn.execute(text("PRAGMA table_info('votepermit')"))
+            cols = [row[1] for row in result]
+            if "voter_registration" not in cols:
+                conn.execute(text("ALTER TABLE votepermit ADD COLUMN voter_registration TEXT"))
+            # Unique index to ensure one matrícula per sessão (NULLs allowed for legacy rows)
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_votepermit_session_registration "
+                    "ON votepermit (session_id, voter_registration)"
+                )
+            )
+        except Exception:
+            # Best-effort; if index creation fails, app logic still enforces uniqueness
             pass
 
 

@@ -52,6 +52,8 @@ class VotePermit(SQLModel, table=True):
     issued_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     used_at: Optional[datetime] = Field(default=None)
     used: bool = Field(default=False)
+    # Matrícula do eleitor informada pelo mesário no ato da autorização
+    voter_registration: str = Field(index=True)
 
     session_id: int = Field(foreign_key="votingsession.id")
     session: "VotingSession" = Relationship(back_populates="permits")
