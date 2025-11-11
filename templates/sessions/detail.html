@@ -128,7 +128,13 @@
                     <td>{{ candidate.name }}</td>
                     <td>{{ candidate.registration }}</td>
                     <td>{{ candidate.commission_number }}</td>
-                    <td class="text-end fw-semibold">{{ candidate.votes }}</td>
+                    <td class="text-end fw-semibold">
+                      {% if session.status.value == 'closed' %}
+                        {{ candidate.votes }}
+                      {% else %}
+                        &mdash;
+                      {% endif %}
+                    </td>
                   </tr>
                 {% endfor %}
               {% else %}
@@ -138,13 +144,15 @@
                   </td>
                 </tr>
               {% endif %}
-              <tr>
-                <td>&mdash;</td>
-                <td class="fw-semibold">Voto BRANCO</td>
-                <td></td>
-                <td></td>
-                <td class="text-end fw-semibold">{{ null_votes }}</td>
-              </tr>
+              {% if session.status.value == 'closed' %}
+                <tr>
+                  <td>&mdash;</td>
+                  <td class="fw-semibold">Voto BRANCO</td>
+                  <td></td>
+                  <td></td>
+                  <td class="text-end fw-semibold">{{ null_votes }}</td>
+                </tr>
+              {% endif %}
             </tbody>
           </table>
         </div>

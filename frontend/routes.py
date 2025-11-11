@@ -6,6 +6,11 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from datetime import timezone, timedelta
+try:
+    from zoneinfo import ZoneInfo  # Python 3.9+
+except Exception:  # pragma: no cover
+    ZoneInfo = None  # type: ignore
 from sqlalchemy import func
 from sqlmodel import Session, select
 
@@ -16,6 +21,33 @@ router = APIRouter(tags=["Web"])
 
 templates = Jinja2Templates(directory="templates")
 templates.env.globals["now"] = datetime.utcnow
+
+# Register a Jinja filter to format UTC datetimes in America/Sao_Paulo
+try:
+    LOCAL_TZ = ZoneInfo("America/Sao_Paulo") if ZoneInfo else None  # type: ignore
+except Exception:
+    LOCAL_TZ = None
+if LOCAL_TZ is None:
+    # Fallback: fixed offset -03:00 (Brazil currently sem DST)
+    LOCAL_TZ = timezone(timedelta(hours=-3))
+
+def _to_local(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if getattr(dt, "tzinfo", None) is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(LOCAL_TZ)
+
+
+def fmt_dt(dt: datetime | None, fmt: str = "%d/%m/%Y %H:%M") -> str:
+    try:
+        local_dt = _to_local(dt)
+        return local_dt.strftime(fmt) if local_dt else "-"
+    except Exception:
+        return "-"
+
+
+templates.env.filters["fmt_dt"] = fmt_dt
 
 
 def _session_overview(db_session: Session, voting_session: VotingSession) -> Dict[str, Any]:
@@ -29,8 +61,8 @@ def _session_overview(db_session: Session, voting_session: VotingSession) -> Dic
         "code": voting_session.code,
         "status": voting_session.status,
         "expected_votes": voting_session.expected_votes,
-        "start_time": voting_session.start_time,
-        "end_time": voting_session.end_time,
+        "start_time": _to_local(voting_session.start_time),
+        "end_time": _to_local(voting_session.end_time),
         "total_votes": total_votes,
         "remaining_votes": remaining_votes,
     }
@@ -101,6 +133,10 @@ def session_detail(
                 "votes": vote_count,
             }
         )
+
+    # Ordena os candidatos por número de votos (maior para menor) apenas se a sessão estiver encerrada
+    if voting_session.status == SessionStatus.CLOSED:
+        candidate_votes.sort(key=lambda c: c["votes"], reverse=True)
 
     null_votes = db_session.exec(
         select(func.count(Vote.id)).where((Vote.session_id == voting_session.id) & (Vote.candidate_id == None))
