@@ -1,0 +1,44 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<div id="content-main" class="upload-static-image">
+    <h1>Upload de imagens est&aacute;ticas</h1>
+    <p class="help">
+        Informe um arquivo de imagem cujo nome seja exatamente o c&oacute;digo do produto (ex.: CBH5)
+        ou o nome da categoria (ex.: Graneleira). A imagem ser&aacute; salva como JPG (renomeada com extens&atilde;o .jpg);
+        se um arquivo com o mesmo nome j&aacute; existir, ele ser&aacute; substitu&iacute;do.
+    </p>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        <fieldset class="module aligned">
+            {{ form.non_field_errors }}
+
+            <div class="form-row">
+                {{ form.image_type.errors }}
+                <label class="required">{{ form.image_type.label }}:</label>
+                <div class="related-widget-wrapper">
+                    {{ form.image_type }}
+                </div>
+                <p class="help">Escolha onde salvar: pasta de produto ou de categoria em static/img.</p>
+            </div>
+
+            <div class="form-row">
+                {{ form.image_file.errors }}
+                <label class="required">{{ form.image_file.label }}:</label>
+                {{ form.image_file }}
+                {% if form.image_file.help_text %}
+                    <p class="help">{{ form.image_file.help_text }}</p>
+                {% endif %}
+                <p class="help">Se um arquivo com o mesmo nome j&aacute; existir, ele ser&aacute; substitu&iacute;do.</p>
+            </div>
+        </fieldset>
+
+        <div class="submit-row">
+            <input type="submit" value="Salvar imagem" class="default">
+            <a href="{% url 'admin:index' %}" class="button cancel-link">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

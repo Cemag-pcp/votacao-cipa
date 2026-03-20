@@ -1,0 +1,501 @@
+{% extends "sales/base.html" %}
+{% load static %}
+
+{% block title %}Gerenciar Usuarios - CEMAG{% endblock %}
+{% block nav_manage_class %}active{% endblock %}
+{% block main_class %}container py-5{% endblock %}
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+    
+    .table-hover tbody tr:hover {
+        background-color: #f5f5f5;
+    }
+    
+    .badge {
+        font-size: 0.85rem;
+        padding: 0.35rem 0.65rem;
+    }
+    
+    .card {
+        border: none;
+    }
+
+    /* Modal labels */
+    .modal-body .form-label {
+        color: #212529 !important;
+        font-weight: 500;
+    }
+
+    .modal-body small.form-text {
+        color: #6c757d !important;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<h1 class="mb-4">Gerenciar Acesso de Usuários</h1>
+
+    {% if error %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Erro!</strong> {{ error }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Usuários Ploomes (Total: {{ total_users }})</h5>
+        </div>
+        <div class="card-body">
+            {% if users %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome</th>
+                            <th>Profile ID</th>
+                            <th>Status</th>
+                            <th>Acesso no Sistema</th>
+                            <th>Lista de Preço</th>
+                            <th style="width: 220px;">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr id="user-row-{{ user.id }}" data-login="{{ user.portal_user.login|default:'' }}" data-price-lists="{{ user.price_lists_display|default:'' }}">
+                            <td><strong>{{ user.id }}</strong></td>
+                            <td>{{ user.name }}</td>
+                            <td>{{ user.profileid }}</td>
+                            <td>
+                                {% if user.suspended %}
+                                <span class="badge bg-danger">Suspenso</span>
+                                {% else %}
+                                <span class="badge bg-success">Ativo</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.has_access %}
+                                <div>
+                                    <span class="badge bg-success mb-2">Sim</span>
+                                    <br>
+                                    <small class="text-muted">
+                                        Login: <strong>{{ user.portal_user.login }}</strong>
+                                    </small>
+                                </div>
+                                {% else %}
+                                <span class="badge bg-warning">Não</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.has_access %}
+                                <small class="text-muted">{{ user.price_lists_display|default:"-" }}</small>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.has_access %}
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-secondary" disabled>
+                                        <i class="bi bi-check-circle"></i> Acesso Existente
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                            onclick="editUserAccess({{ user.id }}, '{{ user.name }}')">
+                                        <i class="bi bi-pencil"></i> Editar
+                                    </button>
+                                </div>
+                                {% else %}
+                                <button type="button" class="btn btn-sm btn-success" 
+                                        onclick="createUserAccess({{ user.id }}, '{{ user.name }}')">
+                                    <i class="bi bi-plus-circle"></i> Criar Acesso
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info" role="alert">
+                Nenhum usuário encontrado.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+{% endblock %}
+{% block body_end %}
+<!-- Modal para criar acesso -->
+<div class="modal fade" id="createAccessModal" tabindex="-1" aria-labelledby="createAccessModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="createAccessModalLabel">Criar Acesso no Sistema</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="accessForm">
+                    <input type="hidden" id="ploomes_user_id" name="ploomes_user_id">
+                    
+                    <div class="mb-3">
+                        <label for="userName" class="form-label">Nome do Usuário</label>
+                        <input type="text" class="form-control" id="userName" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="loginInput" class="form-label">Login <small class="text-muted">(opcional)</small></label>
+                        <input type="text" class="form-control" id="loginInput" placeholder="Deixe em branco para usar o nome">
+                        <small class="form-text text-muted">Se não preenchido, será gerado automaticamente a partir do nome.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="passwordInput" class="form-label">Senha</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="passwordInput" placeholder="Digite a senha" required>
+                            <button class="btn btn-outline-secondary" type="button" id="togglePasswordBtn" onclick="togglePasswordVisibility()">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <small class="form-text text-muted">A senha deve ter pelo menos 6 caracteres.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="priceListsInput" class="form-label">Listas de Preço</label>
+                        <select class="form-select" id="priceListsInput" multiple>
+                            <option value="Lista Preço SDE e COE">Lista Preço SDE e COE</option>
+                            <option value="Lista Preço MT">Lista Preço MT</option>
+                            <option value="Lista Preço N e NE">Lista Preço N e NE</option>
+                        </select>
+                        <small class="form-text text-muted">Selecione uma ou mais listas.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmCreateBtn" onclick="confirmCreateUserAccess()">
+                    <span id="btnSpinner" class="spinner-border spinner-border-sm me-2" style="display:none;" role="status" aria-hidden="true"></span>
+                    Criar Acesso
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Modal para editar acesso -->
+<div class="modal fade" id="editAccessModal" tabindex="-1" aria-labelledby="editAccessModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="editAccessModalLabel">Editar Acesso</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editAccessForm">
+                    <input type="hidden" id="edit_ploomes_user_id" name="ploomes_user_id">
+                    
+                    <div class="mb-3">
+                        <label for="editUserName" class="form-label">Nome do Usuário</label>
+                        <input type="text" class="form-control" id="editUserName" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editLoginInput" class="form-label">Login</label>
+                        <input type="text" class="form-control" id="editLoginInput" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editPasswordInput" class="form-label">Nova senha <small class="text-muted">(opcional)</small></label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="editPasswordInput" placeholder="Deixe em branco para manter">
+                            <button class="btn btn-outline-secondary" type="button" id="toggleEditPasswordBtn" onclick="toggleEditPasswordVisibility()">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <small class="form-text text-muted">Se preenchida, deve ter pelo menos 6 caracteres.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editPriceListsInput" class="form-label">Listas de Preço</label>
+                        <select class="form-select" id="editPriceListsInput" multiple>
+                            <option value="Lista Preço SDE e COE">Lista Preço SDE e COE</option>
+                            <option value="Lista Preço MT">Lista Preço MT</option>
+                            <option value="Lista Preço N e NE">Lista Preço N e NE</option>
+                        </select>
+                        <small class="form-text text-muted">Selecione uma ou mais listas.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmEditBtn" onclick="confirmEditUserAccess()">
+                    <span id="editBtnSpinner" class="spinner-border spinner-border-sm me-2" style="display:none;" role="status" aria-hidden="true"></span>
+                    Salvar alterações
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentUserId = null;
+    let currentUserName = null;
+
+    function createUserAccess(userId, userName) {
+        console.log('createUserAccess called with:', userId, userName);
+        currentUserId = userId;
+        currentUserName = userName;
+        
+        document.getElementById('ploomes_user_id').value = userId;
+        document.getElementById('userName').value = userName;
+        document.getElementById('loginInput').value = '';
+        document.getElementById('passwordInput').value = '';
+        const priceListsInput = document.getElementById('priceListsInput');
+        if (priceListsInput) {
+            Array.from(priceListsInput.options).forEach((opt) => {
+                opt.selected = false;
+            });
+        }
+        
+        const modal = new bootstrap.Modal(document.getElementById('createAccessModal'));
+        modal.show();
+    }
+
+    function togglePasswordVisibility() {
+        const passwordInput = document.getElementById('passwordInput');
+        const toggleBtn = document.getElementById('togglePasswordBtn');
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            toggleBtn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+        } else {
+            passwordInput.type = 'password';
+            toggleBtn.innerHTML = '<i class="bi bi-eye"></i>';
+        }
+    }
+
+    function toggleEditPasswordVisibility() {
+        const passwordInput = document.getElementById('editPasswordInput');
+        const toggleBtn = document.getElementById('toggleEditPasswordBtn');
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            toggleBtn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+        } else {
+            passwordInput.type = 'password';
+            toggleBtn.innerHTML = '<i class="bi bi-eye"></i>';
+        }
+    }
+
+    function editUserAccess(userId, userName) {
+        const row = document.getElementById('user-row-' + userId);
+        const login = row?.dataset?.login || '';
+        const priceListsText = row?.dataset?.priceLists || '';
+        const priceLists = priceListsText ? priceListsText.split(',').map((item) => item.trim()).filter(Boolean) : [];
+
+        document.getElementById('edit_ploomes_user_id').value = userId;
+        document.getElementById('editUserName').value = userName;
+        document.getElementById('editLoginInput').value = login;
+        document.getElementById('editPasswordInput').value = '';
+
+        const priceListsInput = document.getElementById('editPriceListsInput');
+        if (priceListsInput) {
+            Array.from(priceListsInput.options).forEach((opt) => {
+                opt.selected = priceLists.includes(opt.value);
+            });
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('editAccessModal'));
+        modal.show();
+    }
+
+    function confirmCreateUserAccess() {
+        console.log('confirmCreateUserAccess called');
+        const userId = document.getElementById('ploomes_user_id').value;
+        const userName = document.getElementById('userName').value;
+        const login = document.getElementById('loginInput').value;
+        const password = document.getElementById('passwordInput').value;
+        const priceListsInput = document.getElementById('priceListsInput');
+        const priceLists = priceListsInput
+            ? Array.from(priceListsInput.selectedOptions).map((opt) => opt.value)
+            : [];
+        
+        console.log('Form values:', {userId, userName, login, password});
+        
+        if (!password || password.length < 6) {
+            showErrorMessage('A senha deve ter pelo menos 6 caracteres.');
+            return;
+        }
+        
+        const btnSpinner = document.getElementById('btnSpinner');
+        const confirmBtn = document.getElementById('confirmCreateBtn');
+        
+        btnSpinner.style.display = 'inline-block';
+        confirmBtn.disabled = true;
+        
+        fetch('{% url "create-user-access" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({
+                ploomes_user_id: parseInt(userId),
+                name: userName,
+                login: login || null,
+                password: password,
+                price_lists: priceLists,
+            })
+        })
+        .then(response => {
+            const jsonResponse = response.json();
+            return jsonResponse.then(data => ({ response, data }));
+        })
+        .then(({ response, data }) => {
+            btnSpinner.style.display = 'none';
+            confirmBtn.disabled = false;
+            
+            if (data.detail) {
+                if (response.ok) {
+                    showSuccessMessage(data.detail);
+                    updateUserRow(userId);
+                    bootstrap.Modal.getInstance(document.getElementById('createAccessModal')).hide();
+                } else {
+                    showErrorMessage(data.detail);
+                }
+            }
+        })
+        .catch(error => {
+            btnSpinner.style.display = 'none';
+            confirmBtn.disabled = false;
+            showErrorMessage('Erro ao criar acesso: ' + error);
+        });
+    }
+
+    function confirmEditUserAccess() {
+        const userId = document.getElementById('edit_ploomes_user_id').value;
+        const login = document.getElementById('editLoginInput').value;
+        const password = document.getElementById('editPasswordInput').value;
+        const priceListsInput = document.getElementById('editPriceListsInput');
+        const priceLists = priceListsInput
+            ? Array.from(priceListsInput.selectedOptions).map((opt) => opt.value)
+            : [];
+
+        if (!login) {
+            showErrorMessage('Informe um login.');
+            return;
+        }
+
+        if (password && password.length < 6) {
+            showErrorMessage('A senha deve ter pelo menos 6 caracteres.');
+            return;
+        }
+
+        const btnSpinner = document.getElementById('editBtnSpinner');
+        const confirmBtn = document.getElementById('confirmEditBtn');
+
+        btnSpinner.style.display = 'inline-block';
+        confirmBtn.disabled = true;
+
+        fetch('{% url "update-user-access" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({
+                ploomes_user_id: parseInt(userId),
+                login: login,
+                password: password || null,
+                price_lists: priceLists,
+            })
+        })
+        .then(response => {
+            const jsonResponse = response.json();
+            return jsonResponse.then(data => ({ response, data }));
+        })
+        .then(({ response, data }) => {
+            btnSpinner.style.display = 'none';
+            confirmBtn.disabled = false;
+
+            if (data.detail) {
+                if (response.ok) {
+                    showSuccessMessage(data.detail);
+                    updateUserRow(userId);
+                    bootstrap.Modal.getInstance(document.getElementById('editAccessModal')).hide();
+                } else {
+                    showErrorMessage(data.detail);
+                }
+            }
+        })
+        .catch(error => {
+            btnSpinner.style.display = 'none';
+            confirmBtn.disabled = false;
+            showErrorMessage('Erro ao atualizar acesso: ' + error);
+        });
+    }
+
+    function updateUserRow(userId) {
+        const row = document.getElementById('user-row-' + userId);
+        if (row) {
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        }
+    }
+
+    function showSuccessMessage(message) {
+        const alertHtml = `
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <strong>Sucesso!</strong> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        const container = document.querySelector('main');
+        const newDiv = document.createElement('div');
+        newDiv.innerHTML = alertHtml;
+        container.insertBefore(newDiv.firstChild, container.firstChild.nextSibling.nextSibling);
+    }
+
+    function showErrorMessage(message) {
+        const alertHtml = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <strong>Erro!</strong> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        const container = document.querySelector('main');
+        const newDiv = document.createElement('div');
+        newDiv.innerHTML = alertHtml;
+        container.insertBefore(newDiv.firstChild, container.firstChild.nextSibling.nextSibling);
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}
+

@@ -1,0 +1,288 @@
+﻿{% extends "sales/base.html" %}
+{% load static %}
+
+{% block title %}Criar Cotação - CEMAG{% endblock %}
+{% block nav_create_class %}active{% endblock %}
+{% block extra_head %}
+<style>
+        .catalog-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .catalog-photo-wrapper {
+            border-radius: 1rem 1rem 0 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, rgba(0,0,0,0.35), rgba(255,255,255,0.06));
+        }
+        .catalog-photo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        /* garante que o modal de filtros fique acima de overlays existentes */
+        #filtrosModal {
+            z-index: 2002;
+        }
+        .modal-backdrop.show {
+            z-index: 2001;
+            display: none; /* removemos o backdrop para evitar bloqueio */
+        }
+    </style>
+{% endblock %}
+{% block content %}
+<!-- Spinner de carregamento -->
+    <div id="loadingOverlay" class="d-none" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 9999; display: flex; align-items: center; justify-content: center;">
+        <div class="text-center">
+            <div class="spinner-border text-light" role="status" style="width: 4rem; height: 4rem;">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p class="text-light mt-3 fs-5">Buscando opções disponíveis...</p>
+        </div>
+    </div>
+
+    <div id="formSection" class="glass p-4 rounded-4 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h4 class="mb-1">Criar nova cotação</h4>
+                <p class="muted mb-0">Preencha os dados básicos e enviaremos para a API Ploomes.</p>
+            </div>
+            <a href="{% url 'home' %}" class="btn btn-outline-light btn-sm">Voltar</a>
+        </div>
+
+        <div id="alertArea"></div>
+        <div id="alertCart" class="alert alert-success d-none" role="alert"></div>
+
+        <form id="quoteForm" class="row g-3 align-items-end" data-price-list="{{ price_list }}" data-price-lists="{{ price_lists|join:'||' }}" data-profile-id="{{ profile_id|default:'' }}">
+
+            <input type="hidden" name="owner_id" value="{{ owner_id }}">
+            <input type="hidden" name="revenda_id" id="revendaId">
+            <input type="hidden" name="revenda_contato_id" id="revendaContatoId">
+            <input type="hidden" name="forma_pagamento_id" id="formaPagamentoId">
+            <input type="hidden" name="forma_pagamento_tipo_2" id="formaPagamentoIdTipo2">
+            <input type="hidden" name="uf_id" id="ufId">
+
+            <div class="col-md-4">
+                <label class="form-label">Nome da revenda (obrigatório)</label>
+                <div class="position-relative">
+                    <input type="text" class="form-control" name="revenda_nome" id="revendaNome" required placeholder="Digite para buscar..." autocomplete="off">
+                    <div id="revendaNomeDropdown" class="list-group position-absolute w-100 d-none" style="z-index: 2005; max-height: 380px; overflow-y: auto; font-size: 70%;"></div>
+                </div>
+                <!-- Mantido para compatibilidade com o modo de revisão (copia opções para o datalist de confirmação) -->
+                <datalist id="revendaOptions"></datalist>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Contato da revenda (opcional)</label>
+                <div class="position-relative">
+                    <input type="text" class="form-control" name="revenda_contato" id="revendaContato" placeholder="Selecione após escolher a revenda" autocomplete="off"  disabled>
+                    <div id="revendaContatoDropdown" class="list-group position-absolute w-100 d-none" style="z-index: 2005; max-height: 260px; overflow: auto; font-size: 70%;"></div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Condição de pagamento (obrigatório)</label>
+                <select class="form-select" name="payment" id="paymentSelect" required disabled>
+                    <option value="">Selecione um contato</option>
+                </select>
+            </div>
+            <div class="col-12 d-flex justify-content-end align-items-center gap-2">
+                <button type="submit" class="btn btn-primary" id="submitQuote">Continuar</button>
+                <div id="spinnerSubmit" class="spinner-border text-light d-none" role="status" style="width: 1.5rem; height: 1.5rem;">
+                    <span class="visually-hidden">aguarde...</span>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="glass p-4 rounded-4 mb-4 d-none" id="catalogSection">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="mb-1">Tabela de preços</h5>
+                <p class="muted mb-0">Filtre e escolha os itens para o carrinho.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <select class="form-select" id="priceListFilter" style="max-width: 220px;"></select>
+            </div>
+        </div>
+
+        <div class="row g-2 mb-3">
+            <div class="col-12">
+                <label class="form-label text-light mb-1">Buscar</label>
+                <input type="text" class="form-control" id="catalogSearch" placeholder="Tanque, CBH, Roçadeira....">
+            </div>
+            <div class="col-12" id="etapaModeloSimples">
+                <label class="form-label text-light">Modelo simples</label>
+                <div id="modeloSimplesCards" class="row row-cols-1 row-cols-md-3 row-cols-xl-4 g-2"></div>
+                <select class="form-select d-none" id="filtroModeloSimples"></select>
+            </div>
+            <div class="col-12" id="etapaCategoria">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="form-label text-light mb-0">Categoria</label>
+                    <button class="btn btn-sm btn-outline-light d-none btn-voltar-catalogo">Voltar</button>
+                </div>
+                <div id="categoriaCards" class="row row-cols-1 row-cols-md-3 row-cols-xl-4 g-2"></div>
+                <select class="form-select d-none" id="filtroCategoria"></select>
+            </div>
+            <div class="col-12 d-none" id="etapaModelo">
+                <div class="d-flex justify-content-between align-items-center">
+                    <label class="form-label text-light">Modelo</label>
+                    <button class="btn btn-sm btn-outline-light d-none btn-voltar-catalogo">Voltar</button>
+                </div>
+                <div id="modeloCards" class="row row-cols-1 row-cols-md-3 row-cols-xl-4 g-2"></div>
+                <select class="form-select d-none" id="filtroModelo"></select>
+            </div>
+            <div class="d-none" id="etapaOutrosFiltros">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-semibold text-light">Filtros adicionais</span>
+                    <button type="button" id="btnToggleFiltros" class="btn btn-sm btn-outline-light">Filtros avançados</button>
+                </div>
+                <select class="form-select d-none" id="filtroEixo"></select>
+                <select class="form-select d-none" id="filtroMola"></select>
+                <select class="form-select d-none" id="filtroFreio"></select>
+                <select class="form-select d-none" id="filtroTamanho"></select>
+                <select class="form-select d-none" id="filtroRodado"></select>
+                <select class="form-select d-none" id="filtroPneu"></select>
+                <select class="form-select d-none" id="filtroOpcionais"></select>
+            </div>
+        </div>
+
+
+
+    </div>
+
+    <div class="glass p-4 rounded-4 mb-4 d-none" id="productSection">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="mb-1">Produtos</h5>
+            </div>
+        </div>
+
+        <div id="catalogEmpty" class="text-center text-secondary d-none">Nenhum produto encontrado.</div>
+        <div id="catalogGrid" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3"></div>
+    </div>
+
+    <!-- Modal de filtros adicionais -->
+    <div class="modal fade" id="filtrosModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content" style="border: 1px solid #e2e8f0; border-radius: 16px;">
+                <div class="modal-header" style="border-bottom: 1px solid #e2e8f0;">
+                    <h5 class="modal-title" style="color: #0f172a;">
+                        <span style="color: #4f46e5;">⚙</span> Filtros adicionais
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="filtrosModalBody" class="row g-3"></div>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid #e2e8f0;">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+{% block body_end %}
+<button id="cartFloatingBtn" class="btn btn-success btn-lg cart-floating-btn d-none">🛒</button>
+<span id="cartCountBadge" class="badge bg-danger rounded-pill position-fixed d-none" style="bottom: 74px; right: 12px; z-index: 1061; min-width: 32px; text-align: center;">
+    0
+</span>
+<div id="cartOverlay" class="cart-overlay d-none">
+    <div class="cart-panel">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Carrinho de compras</h6>
+            <button class="btn btn-sm btn-outline-light" id="closeCart">Fechar</button>
+        </div>
+        <div class="cart-body">
+            <div class="table-responsive">
+                <table class="table table-dark table-striped align-middle mb-2 cart-table price-table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th style="width: 350px;">Item</th>
+                            <th style="width: 130px;">Cor</th>
+                            <th style="width: 120px;">Preço</th>
+                            <th style="width: 80px;">Desc. (%)</th>
+                            <th style="width: 120px;">Preço unit.</th>
+                            <th style="width: 70px;">Qtd</th>
+                            <th style="width: 130px;">Total</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="cartTableBody"></tbody>
+                </table>
+            </div>
+            <div id="cartEmpty" class="text-center text-secondary d-none">Carrinho vazio.</div>
+        </div>
+        <div class="cart-total-bar d-flex justify-content-between align-items-center mt-2">
+            <div>
+                <span class="muted">Total</span>
+                <strong id="cartTotalValue" class="ms-2">R$ 0,00</strong>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-light btn-sm" id="clearCartBtn">Limpar carrinho</button>
+                <button class="btn btn-primary btn-sm" id="confirmCartBtn">Continuar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="confirmOverlay" class="confirm-overlay d-none">
+    <div class="confirm-panel">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="mb-0">Confirmação de pedido</h5>
+                <small class="muted">Revise antes de finalizar</small>
+            </div>
+            <button class="btn btn-sm btn-outline-light" id="closeConfirm">Voltar</button>
+        </div>
+
+        <!-- Campos de formulário para modo de revisão -->
+        <div id="confirmFormFields" class="d-none mb-4">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Nome da revenda <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" name="confirm_revenda_nome" id="confirmRevendaNome" list="confirmRevendaOptions" required placeholder="Digite para buscar..." autocomplete="off">
+                    <datalist id="confirmRevendaOptions"></datalist>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Contato da revenda</label>
+                    <div class="position-relative">
+                        <input type="text" class="form-control" name="confirm_revenda_contato" id="confirmRevendaContato" placeholder="Selecione após escolher a revenda" autocomplete="off"  disabled>
+                        <div id="confirmRevendaContatoDropdown" class="list-group position-absolute w-100 d-none" style="z-index: 2005; max-height: 260px; overflow: auto; font-size: 70%;"></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Condição de pagamento <span class="text-danger">*</span></label>
+                    <select class="form-select" name="confirm_payment" id="confirmPaymentSelect" required disabled>
+                        <option value="">Selecione um contato</option>
+                    </select>
+                </div>
+            </div>
+            <input type="hidden" name="confirm_revenda_id" id="confirmRevendaId">
+            <input type="hidden" name="confirm_revenda_contato_id" id="confirmRevendaContatoId">
+            <input type="hidden" name="confirm_forma_pagamento_id" id="confirmFormaPagamentoId">
+            <input type="hidden" name="confirm_forma_pagamento_tipo_2" id="confirmFormaPagamentoIdTipo2">
+            <input type="hidden" name="confirm_uf_id" id="confirmUfId">
+        </div>
+
+        <div id="confirmSummary" class="mb-3"></div>
+        <div class="confirm-body mb-2">
+            <div class="row g-3" id="confirmCardsBody">
+                <!-- Os cards dos itens serão renderizados via JS -->
+            </div>
+        </div>
+        <div class="mb-3">
+            <label for="confirmNotes" class="form-label">Observação</label>
+            <textarea id="confirmNotes" class="form-control" rows="3" placeholder="Inclua observações para este pedido"></textarea>
+        </div>
+        <div class="confirm-footer d-flex justify-content-between align-items-center">
+            <span class="muted">Revise antes de salvar</span>
+            <div class="d-flex align-items-center gap-3">
+                <span class="fw-bold text-success" id="confirmTotalValue">Total: R$ 0,00</span>
+                <button class="btn btn-primary btn-sm" id="saveOrderBtn">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script defer src="{% static 'js/alerts.js' %}"></script>
+<script defer src="{% static 'js/create_quote.js' %}"></script>
+{% endblock %}
+

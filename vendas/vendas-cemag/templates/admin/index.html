@@ -1,0 +1,22 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block content %}
+<div id="content-main">
+    <div class="module">
+        <h2>Atalhos</h2>
+        <ul class="actionlist">
+            <li>
+                <a href="{% url 'upload-static-image' %}">Upload de imagens est&aacute;ticas (produto/modelo)</a>
+                <span class="help">Envia arquivos para static/img/produto ou static/img/modelo.</span>
+            </li>
+        </ul>
+    </div>
+
+    {% if app_list %}
+        {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+    {% else %}
+        <p>{% translate "You don't have permission to view or edit anything." %}</p>
+    {% endif %}
+</div>
+{% endblock %}

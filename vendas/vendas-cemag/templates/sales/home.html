@@ -1,0 +1,234 @@
+{% extends "sales/base.html" %}
+{% load static %}
+
+{% block title %}Painel de Cotações - CEMAG{% endblock %}
+{% block nav_home_class %}active{% endblock %}
+{% block nav_actions %}
+<button id="refreshBtn" class="btn btn-outline-light btn-sm">Atualizar</button>
+<a href="{% url 'logout' %}" class="btn btn-outline-light btn-sm">Sair</a>
+{% endblock %}
+{% block content %}
+<div class="row g-3 mb-3 glass p-3 rounded-4">
+        <div class="col-md-3" style="display: none;">
+            <label class="form-label">OwnerId</label>
+            <input type="number" class="form-control" id="inputLogin" placeholder="Definido no login" data-owner="{{ owner_id }}" readonly>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Status</label>
+            <select id="statusFilter" class="form-select">
+                <option value="">Todos</option>
+                <option value="1">Aberto</option>
+                <option value="2">Ganho</option>
+                <option value="3">Perdido</option>
+                <option value="outros">Outros</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Aceite Externo</label>
+            <select id="aceiteExternoFilter" class="form-select">
+                <option value="">Todos</option>
+                <option value="true">Aceitos</option>
+                <option value="false">Não aceitos</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Aprovação Desconto</label>
+            <select id="aprovacaoDescontoFilter" class="form-select">
+                <option value="">Todos</option>
+                <option value="2">Aprovado</option>
+                <option value="1">Aguardando</option>
+                <option value="null">N/A</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Revenda (contém)</label>
+            <input type="text" class="form-control" id="revendaFilter" placeholder="Nome da revenda">
+        </div>
+        <div class="col-12 d-flex flex-column flex-md-row justify-content-md-end gap-2">
+            <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-primary" id="loadBtn">Buscar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <div class="card metric-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Prazo - Carretas avulsas</h6>
+                    <span class="badge bg-secondary status-chip" id="deliveryDeadlineStatusAvulsa">Carregando</span>
+                </div>
+                <p class="mb-0" id="deliveryDeadlineAvulsa">Para carretas avulsas, o prazo de entrega é: --/--/----</p>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card metric-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Prazo - Cargas fechadas</h6>
+                    <span class="badge bg-secondary status-chip" id="deliveryDeadlineStatusFechada">Carregando</span>
+                </div>
+                <p class="mb-0" id="deliveryDeadlineFechada">Para cargas fechadas, o prazo de entrega é: --/--/----</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <div class="card metric-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="muted mb-1">Propostas em aberto</p>
+                        <h4 id="metricOpen" class="mb-0">0</h4>
+                    </div>
+                    <span class="badge bg-success status-chip">Ativas</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card metric-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="muted mb-1">Valor em aberto</p>
+                        <h4 id="metricOpenAmount" class="mb-0">R$ 0,00</h4>
+                    </div>
+                    <span class="badge bg-warning text-dark status-chip">Aberto</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <div class="card metric-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="muted mb-1">Cotações ganhas (mês atual)</p>
+                        <h4 id="metricWonMonthAmount" class="mb-0">R$ 0,00</h4>
+                    </div>
+                    <span class="badge bg-success status-chip">Ganho</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card metric-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="muted mb-1">Cotações ganhas (mês atual)</p>
+                        <h4 id="metricWonMonthCount" class="mb-0">0</h4>
+                    </div>
+                    <span class="badge bg-info text-dark status-chip">Mês</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="alertArea"></div>
+    <div id="cardsContainer" class="row g-3"></div>
+    <div id="spinnerArea" class="text-center my-3 d-none">
+        <div class="spinner-border text-light" role="status">
+            <span class="visually-hidden">Carregando...</span>
+        </div>
+        <p class="muted mt-2 mb-0">Carregando cotações...</p>
+    </div>
+    <div id="spinnerAreaBottom" class="text-center my-3 d-none">
+        <div class="spinner-border text-light" role="status">
+            <span class="visually-hidden">Carregando...</span>
+        </div>
+        <p class="muted mt-2 mb-0">Carregando mais...</p>
+    </div>
+{% endblock %}
+{% block body_end %}
+<!-- Modal de contatos da revenda -->
+<div class="modal fade" id="contactModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header">
+                <h5 class="modal-title" id="contactModalLabel">Selecionar contato</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="contactModalSpinner" class="d-none text-center my-3">
+                    <div class="spinner-border text-light" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                </div>
+                <div id="contactModalBody">
+                    <label class="form-label">Contatos</label>
+                    <select id="contactModalSelect" class="form-select">
+                        <option value="">Selecione</option>
+                    </select>
+                    <div id="contactModalEmpty" class="text-secondary small mt-2 d-none">Nenhum contato encontrado para esta revenda.</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="contactModalSave">Aplicar</button>
+            </div>
+        </div>
+    </div>
+ </div>
+
+<!-- Modal para confirmar ganhar proposta -->
+<div class="modal fade" id="winDealModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header border-success">
+                <h5 class="modal-title">
+                    <span class="text-success">✓</span> Confirmar proposta ganha
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">Deseja confirmar que esta proposta foi <strong class="text-success">ganha</strong>?</p>
+                <div class="card bg-dark border border-secondary p-3">
+                    <div class="mb-2">
+                        <span class="muted">Cliente:</span>
+                        <strong id="winDealClient" class="ms-2">--</strong>
+                    </div>
+                    <div class="mb-2">
+                        <strong id="winDealContact" class="ms-2">--</strong>
+                    </div>
+                    <div class="mb-2">
+                        <span class="muted">Valor:</span>
+                        <strong id="winDealAmount" class="ms-2 text-success">R$ 0,00</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-success">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" id="winDealConfirm">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para confirmar perda da proposta -->
+<div class="modal fade" id="loseDealModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom: 1px solid #e2e8f0;">
+                <h5 class="modal-title">
+                    <span style="color: #ff8a2e;">⚠</span> Confirmar perda da proposta
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">Deseja confirmar que esta proposta foi <strong style="color: #ff8a2e;">perdida</strong>?</p>
+                <div class="mb-3">
+                    <label for="loseDealReasonSelect" class="form-label">Motivo da perda</label>
+                    <select id="loseDealReasonSelect" class="form-select">
+                        <option value="">Selecione...</option>
+                    </select>
+                    <div id="loseDealReasonEmpty" class="text-secondary small mt-2 d-none">Nenhum motivo encontrado.</div>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #e2e8f0;">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn" id="loseDealConfirm" style="background-color: #ff8a2e; border-color: #ff8a2e; color: #fff;">Confirmar perda</button>
+            </div>
+        </div>
+    </div>
+ </div>
+<script defer src="{% static 'js/alerts.js' %}"></script>
+<script defer src="{% static 'js/home.js' %}"></script>
+{% endblock %}

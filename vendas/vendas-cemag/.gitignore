@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+venv/
+
+# Environment / secrets
+.env
+
+# Django static collect
+staticfiles/
